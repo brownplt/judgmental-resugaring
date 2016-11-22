@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
-use term::{Name, Term};
-use term::Term::{Hole, Const, Var, Stx};
+use fresh::Atom;
+use term::Term;
+use term::Term::{Hole, Value, Var, Stx};
 
-pub struct Subs<C> {
-    mapping: HashMap<Name, Term<C>>
+pub struct Subs<V> {
+    mapping: HashMap<Atom, Term<V>>
 }
 
-pub fn unify<C>(s: Term<C>, t: Term<C>) -> Option<Subs<C>>
-    where C : Clone + Eq
+pub fn unify<V>(s: Term<V>, t: Term<V>) -> Option<Subs<V>>
+    where V : Clone + Eq
 {
     let mut subs = Subs::new();
     if subs.unify(s, t) {
@@ -18,17 +19,17 @@ pub fn unify<C>(s: Term<C>, t: Term<C>) -> Option<Subs<C>>
     }
 }
 
-impl<C> Subs<C> where C : Clone {
-    pub fn apply(&self, term: Term<C>) -> Term<C> {
+impl<V> Subs<V> where V : Clone {
+    pub fn apply(&self, term: Term<V>) -> Term<V> {
         match term {
-            Hole(name) => {
-                match self.mapping.get(&name) {
-                    None => Hole(name),
+            Hole(atom) => {
+                match self.mapping.get(&atom) {
+                    None => Hole(atom),
                     Some(term) => term.clone()
                 }
             }
             Var(var) => Var(var),
-            Const(c) => Const(c),
+            Value(c) => Value(c),
             Stx(node, subterms, mark) => {
                 let subterms = subterms.into_iter().map(|term| {
                     self.apply(term)
@@ -38,18 +39,18 @@ impl<C> Subs<C> where C : Clone {
         }
     }
 
-    fn new() -> Subs<C> {
+    fn new() -> Subs<V> {
         Subs{
             mapping: HashMap::new()
         }
     }
 
-    fn insert(&mut self, name: Name, defn: Term<C>) -> bool
-        where C : Clone + Eq
+    fn insert(&mut self, atom: Atom, defn: Term<V>) -> bool
+        where V : Clone + Eq
     {
-        match self.mapping.remove(&name) {
+        match self.mapping.remove(&atom) {
             None => {
-                self.mapping.insert(name, defn);
+                self.mapping.insert(atom, defn);
                 true
             }
             Some(term) => {
@@ -58,23 +59,23 @@ impl<C> Subs<C> where C : Clone {
         }
     }
 
-    fn unify(&mut self, left: Term<C>, right: Term<C>) -> bool
-        where C : Clone + Eq
+    fn unify(&mut self, left: Term<V>, right: Term<V>) -> bool
+        where V : Clone + Eq
     {
         match (left, right) {
             
-            (Hole(name), term) => self.insert(name, term),
-            (term, Hole(name)) => self.insert(name, term),
+            (Hole(atom), term) => self.insert(atom, term),
+            (term, Hole(atom)) => self.insert(atom, term),
             
-            (Var(_),       Const(_))     => false,
+            (Var(_),       Value(_))     => false,
             (Var(_),       Stx(_, _, _)) => false,
-            (Const(_),     Stx(_, _, _)) => false,
-            (Const(_),     Var(_))       => false,
+            (Value(_),     Stx(_, _, _)) => false,
+            (Value(_),     Var(_))       => false,
             (Stx(_, _, _), Var(_))       => false,
-            (Stx(_, _, _), Const(_))     => false,
+            (Stx(_, _, _), Value(_))     => false,
             
             (Var(x), Var(y))     => x == y,
-            (Const(x), Const(y)) => x == y,
+            (Value(x), Value(y)) => x == y,
             
             (Stx(node1, subterms1, mark1), Stx(node2, subterms2, mark2)) => {
                 if node1 != node2 || mark1 != mark2 {

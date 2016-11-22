@@ -1,4 +1,8 @@
 use std::fmt;
+use std::collections::HashSet;
+
+use fresh;
+use fresh::Atom;
 
 use self::Variable::*;
 use self::Term::*;
@@ -31,18 +35,33 @@ pub enum Mark {
 }
 
 #[derive(Clone)]
-pub enum Term<C> {
-    Hole(Name),
-    Const(C),
+pub enum Term<V> {
+    Hole(Atom),
+    Value(V),
     Var(Variable),
-    Stx(Node, Vec<Term<C>>, Mark)
+    Stx(Node, Vec<Term<V>>, Mark)
 }
 
-impl<C> fmt::Display for Term<C> where C : fmt::Display {
+impl<V> fresh::Freshable for Term<V> where V : fresh::Freshable {
+    fn freshen(&mut self, f: &mut fresh::Freshener) {
+        match self {
+            &mut Hole(ref mut atom) => atom.freshen(f),
+            &mut Value(ref mut v)   => v.freshen(f),
+            &mut Var(_)             => (), // TODO: Freshen?
+            &mut Stx(_, ref mut subterms, _) => {
+                for subterm in subterms.iter_mut() {
+                    subterm.freshen(f);
+                }
+            }
+        }
+    }
+}
+
+impl<V> fmt::Display for Term<V> where V : fmt::Display {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Hole(ref hole) => write!(f, "{}", hole),
-            &Const(ref c) => c.fmt(f),
+            &Value(ref v) => v.fmt(f),
             &Var(ref var) => var.fmt(f),
             &Stx(ref node, ref subterms, mark) => {
                 match mark {
