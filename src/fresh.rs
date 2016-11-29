@@ -43,19 +43,37 @@ impl Atom {
     }
 }
 
-pub trait Freshable {
+pub trait HasAtoms {
+    fn atoms(&mut self) -> HashSet<&mut Atom>;
+}
+
+pub trait Freshable : Clone {
     fn freshen(&mut self, state: &mut Freshener);
+}
+
+impl<A, B> Freshable for (A, B) where A : Freshable, B : Freshable {
+    fn freshen(&mut self, state: &mut Freshener) {
+        self.0.freshen(state);
+        self.1.freshen(state);
+    }
 }
 
 pub struct Fresh<T> {
     data:  T
 }
 
-impl<T> Fresh<T> where T : Freshable + Clone {
-    fn freshen(&mut self) -> &mut T {
+impl<T> Fresh<T> where T : Freshable {
+    pub fn new(data: T) -> Fresh<T> {
+        Fresh{
+            data: data
+        }
+    }
+
+    pub fn freshen(&self) -> T {
         let mut freshener = Freshener::new();
-        self.data.freshen(&mut freshener);
-        &mut self.data
+        let mut data = self.data.clone();
+        data.freshen(&mut freshener);
+        data
     }
 }
 
@@ -97,8 +115,8 @@ impl Freshable for Atom {
 }
 
 pub struct Freshener {
-    curr_id: usize,
-    mapping: HashMap<Name, usize>
+    curr_id: Id,
+    mapping: HashMap<Name, Id>
 }
 
 impl Freshener {

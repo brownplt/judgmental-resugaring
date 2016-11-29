@@ -3,29 +3,32 @@ use std::collections::HashMap;
 use fresh::Atom;
 use term::Term;
 use term::Term::{Hole, Value, Var, Stx};
+use tipe::Tipe;
 
-pub struct Subs<V> {
-    mapping: HashMap<Atom, Term<V>>
+
+pub struct Subs<V, T> {
+    term_mapping: HashMap<Atom, Term<V>>,
+    tipe_mapping: HashMap<Atom, Tipe<T>>
 }
 
-pub fn unify<V>(s: Term<V>, t: Term<V>) -> Option<Subs<V>>
-    where V : Clone + Eq
+pub fn unify<V, T>(s: &Term<V>, t: &Term<V>) -> Option<Subs<V, T>>
+    where V : Clone + Eq, T : Clone
 {
     let mut subs = Subs::new();
-    if subs.unify(s, t) {
+    if subs.unify_terms(s, t) {
         Some(subs)
     } else {
         None
     }
 }
 
-impl<V> Subs<V> where V : Clone {
+impl<V, T> Subs<V, T> where V : Clone, T : Clone {
     pub fn apply(&self, term: Term<V>) -> Term<V> {
         match term {
             Hole(atom) => {
-                match self.mapping.get(&atom) {
+                match self.term_mapping.get(&atom) {
                     None => Hole(atom),
-                    Some(term) => term.clone()
+                    Some(term) => term.clone() // TODO: Assume unique holes?
                 }
             }
             Var(var) => Var(var),
@@ -39,45 +42,47 @@ impl<V> Subs<V> where V : Clone {
         }
     }
 
-    fn new() -> Subs<V> {
+    fn new() -> Subs<V, T> {
         Subs{
-            mapping: HashMap::new()
+            term_mapping: HashMap::new(),
+            tipe_mapping: HashMap::new()
         }
     }
 
-    fn insert(&mut self, atom: Atom, defn: Term<V>) -> bool
+    fn insert_term(&mut self, atom: Atom, defn: &Term<V>) -> bool
         where V : Clone + Eq
     {
-        match self.mapping.remove(&atom) {
+        match self.term_mapping.remove(&atom) {
             None => {
-                self.mapping.insert(atom, defn);
+                self.term_mapping.insert(atom, defn.clone());
                 true
             }
             Some(term) => {
-                self.unify(term, defn)
+                self.unify_terms(&term, defn)
             }
         }
     }
 
-    fn unify(&mut self, left: Term<V>, right: Term<V>) -> bool
+    fn unify_terms(&mut self, left: &Term<V>, right: &Term<V>) -> bool
         where V : Clone + Eq
     {
         match (left, right) {
             
-            (Hole(atom), term) => self.insert(atom, term),
-            (term, Hole(atom)) => self.insert(atom, term),
+            (&Hole(ref atom), term) => self.insert_term(atom.clone(), term),
+            (term, &Hole(ref atom)) => self.insert_term(atom.clone(), term),
             
-            (Var(_),       Value(_))     => false,
-            (Var(_),       Stx(_, _, _)) => false,
-            (Value(_),     Stx(_, _, _)) => false,
-            (Value(_),     Var(_))       => false,
-            (Stx(_, _, _), Var(_))       => false,
-            (Stx(_, _, _), Value(_))     => false,
+            (&Var(_),       &Value(_))     => false,
+            (&Var(_),       &Stx(_, _, _)) => false,
+            (&Value(_),     &Stx(_, _, _)) => false,
+            (&Value(_),     &Var(_))       => false,
+            (&Stx(_, _, _), &Var(_))       => false,
+            (&Stx(_, _, _), &Value(_))     => false,
             
-            (Var(x), Var(y))     => x == y,
-            (Value(x), Value(y)) => x == y,
+            (&Var(ref x),   &Var(ref y))   => x == y,
+            (&Value(ref x), &Value(ref y)) => x == y,
             
-            (Stx(node1, subterms1, mark1), Stx(node2, subterms2, mark2)) => {
+            (&Stx(ref node1, ref subterms1, ref mark1),
+             &Stx(ref node2, ref subterms2, ref mark2)) => {
                 if node1 != node2 || mark1 != mark2 {
                     return false;
                 }
@@ -85,7 +90,7 @@ impl<V> Subs<V> where V : Clone {
                     return false;
                 }
                 for (s, t) in subterms1.into_iter().zip(subterms2.into_iter()) {
-                    if !self.unify(s, t) {
+                    if !self.unify_terms(s, t) {
                         return false;
                     }
                 }
