@@ -1,8 +1,8 @@
 mod fresh;
 mod term;
 mod unify;
-mod tipe;
 mod rewrite;
+mod deriv;
 
 #[cfg(test)]
 mod tests {

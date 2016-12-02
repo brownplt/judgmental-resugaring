@@ -2,7 +2,7 @@ use std::fmt;
 
 use term::Term;
 use fresh::{Fresh, Freshable};
-use unify::unify;
+use unify::{unify, Substitute, Subs};
 
 struct RewriteRule<V> {
     rule: Fresh<(Term<V>, Term<V>)>
@@ -17,9 +17,9 @@ impl<V> RewriteRule<V> where V : Freshable + Eq {
     
     fn apply(&self, term: &Term<V>) -> Option<Term<V>> {
         let (left, right) = self.rule.freshen();
-        match unify(term, &left) {
+        match unify(term, &left, Subs::empty()) {
             None => None,
-            Some(subs) => Some(subs.apply(right))
+            Some(subs) => Some(right.substitute(&subs))
         }
     }
 }
