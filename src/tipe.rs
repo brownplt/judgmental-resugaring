@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::HashMap;
 
 use fresh::Atom;
-use term::Term;
+use term::{Term, Node, Mark};
 
 pub struct TJudgement<V, T> {
     tenv: TEnv<T>,
@@ -16,14 +16,30 @@ pub struct TEnv<T> {
 
 pub enum Tipe<T> {
     TVar(Atom),
-    TConst(T)
+    TConst(T),
+    TStx(Node, Vec<Tipe<T>>, Mark)
 }
+
 
 impl<T> fmt::Display for Tipe<T> where T : fmt::Display {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Tipe::TVar(ref atom)   => write!(f, "{}", atom),
-            &Tipe::TConst(ref tipe) => write!(f, "{}", tipe)
+            &Tipe::TConst(ref tipe) => write!(f, "{}", tipe),
+            &Tipe::TStx(ref node, ref subtipes, mark) => {
+                match mark {
+                    Mark::Core => try!(write!(f, "(")),
+                    Mark::Surf => try!(write!(f, "["))
+                }
+                try!(write!(f, "{}", node));
+                for subtipe in subtipes.iter() {
+                    try!(write!(f, " {}", subtipe));
+                }
+                match mark {
+                    Mark::Core => write!(f, ")"),
+                    Mark::Surf => write!(f, "]")
+                }
+            }
         }
     }
 }

@@ -2,82 +2,91 @@ use std::collections::HashMap;
 
 use fresh::Atom;
 use term::Term;
-use term::Term::{Hole, Value, Var, Stx};
+use term::Term::{Const, MetaVar, Value, LitVar, Stx, Env};
 
+
+#[derive(Clone)]
 pub struct Subs<V> {
-    mapping: HashMap<Atom, Term<V>>
+    term_mapping: HashMap<Atom, Term<V>>,
 }
 
-pub fn unify<V>(s: Term<V>, t: Term<V>) -> Option<Subs<V>>
+pub fn unify<V>(s: &Term<V>, t: &Term<V>, mut subs: Subs<V>) -> Option<Subs<V>>
     where V : Clone + Eq
 {
-    let mut subs = Subs::new();
-    if subs.unify(s, t) {
+    if subs.unify_terms(s, t) {
         Some(subs)
     } else {
         None
     }
 }
 
-impl<V> Subs<V> where V : Clone {
-    pub fn apply(&self, term: Term<V>) -> Term<V> {
-        match term {
-            Hole(atom) => {
-                match self.mapping.get(&atom) {
-                    None => Hole(atom),
-                    Some(term) => term.clone()
+pub trait Substitute<V> {
+    fn substitute(self, subs: &Subs<V>) -> Self;
+}
+
+impl<V> Substitute<V> for Term<V> where V : Clone {
+    fn substitute(self, subs: &Subs<V>) -> Term<V> {
+        match self {
+            MetaVar(atom) => {
+                match subs.term_mapping.get(&atom) {
+                    None => MetaVar(atom),
+                    Some(term) => term.clone() // TODO: Assume unique consts?
                 }
             }
-            Var(var) => Var(var),
+            Const(atom) => Const(atom),
+            LitVar(var) => LitVar(var),
             Value(c) => Value(c),
             Stx(node, subterms, mark) => {
                 let subterms = subterms.into_iter().map(|term| {
-                    self.apply(term)
+                    term.substitute(subs)
                 }).collect();
                 Stx(node, subterms, mark)
             }
+            Env(var, env) => {
+                let env = env.into_iter().map(|(key, term)| {
+                    (key, term.substitute(subs))
+                }).collect();
+                // TODO: Subs into env var?
+                Env(var, env)
+            }
         }
     }
+}
 
-    fn new() -> Subs<V> {
+impl<V> Subs<V> {
+    pub fn empty() -> Subs<V> {
         Subs{
-            mapping: HashMap::new()
+            term_mapping: HashMap::new()
         }
     }
 
-    fn insert(&mut self, atom: Atom, defn: Term<V>) -> bool
+    fn insert_term(&mut self, atom: Atom, defn: &Term<V>) -> bool
         where V : Clone + Eq
     {
-        match self.mapping.remove(&atom) {
+        match self.term_mapping.remove(&atom) {
             None => {
-                self.mapping.insert(atom, defn);
+                self.term_mapping.insert(atom, defn.clone());
                 true
             }
             Some(term) => {
-                self.unify(term, defn)
+                self.unify_terms(&term, defn)
             }
         }
     }
 
-    fn unify(&mut self, left: Term<V>, right: Term<V>) -> bool
+    fn unify_terms(&mut self, left: &Term<V>, right: &Term<V>) -> bool
         where V : Clone + Eq
     {
         match (left, right) {
             
-            (Hole(atom), term) => self.insert(atom, term),
-            (term, Hole(atom)) => self.insert(atom, term),
+            (&Const(ref atom), term) => self.insert_term(atom.clone(), term),
+            (term, &Const(ref atom)) => self.insert_term(atom.clone(), term),
+                        
+            (&LitVar(ref x), &LitVar(ref y)) => x == y,
+            (&Value(ref x),  &Value(ref y))  => x == y,
             
-            (Var(_),       Value(_))     => false,
-            (Var(_),       Stx(_, _, _)) => false,
-            (Value(_),     Stx(_, _, _)) => false,
-            (Value(_),     Var(_))       => false,
-            (Stx(_, _, _), Var(_))       => false,
-            (Stx(_, _, _), Value(_))     => false,
-            
-            (Var(x), Var(y))     => x == y,
-            (Value(x), Value(y)) => x == y,
-            
-            (Stx(node1, subterms1, mark1), Stx(node2, subterms2, mark2)) => {
+            (&Stx(ref node1, ref subterms1, ref mark1),
+             &Stx(ref node2, ref subterms2, ref mark2)) => {
                 if node1 != node2 || mark1 != mark2 {
                     return false;
                 }
@@ -85,12 +94,22 @@ impl<V> Subs<V> where V : Clone {
                     return false;
                 }
                 for (s, t) in subterms1.into_iter().zip(subterms2.into_iter()) {
-                    if !self.unify(s, t) {
+                    if !self.unify_terms(s, t) {
                         return false;
                     }
                 }
                 true
             }
+
+            (&Env(ref var1, ref env1),
+             &Env(ref var2, ref env2)) => {
+                if !self.insert_term(var1.clone(), &MetaVar(var2.clone())) {
+                    return false;
+                }
+                panic!("NYI")
+            }
+
+            (_, _) => false
         }
     }
 }
