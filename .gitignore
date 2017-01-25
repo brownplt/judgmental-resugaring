@@ -7,3 +7,9 @@
 Cargo.lock
 target
 Cargo.lock
+
+# OCaml & BS
+*.cmi
+*.cmj
+*.js
+/bs/node_modules/
