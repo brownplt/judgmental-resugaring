@@ -11,5 +11,7 @@ Cargo.lock
 # OCaml & BS
 *.cmi
 *.cmj
+*.cmt
+*.cmti
 *.js
 /bs/node_modules/
