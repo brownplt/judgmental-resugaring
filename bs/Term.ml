@@ -20,6 +20,8 @@ module Term (Head: Symbol.Symbol) =
       | Stx(head, _) -> Printf.sprintf "term %s"  (Head.show head);;
       
     let go msg =
-      print_endline msg;;  
+      print_endline msg;;
+
+    let plus(x, y) = x + y;;
 
   end

@@ -9,6 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bs-platform": "^1.3.3"
+    "bs-platform": "^1.5.0"
   }
 }

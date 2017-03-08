@@ -4,7 +4,8 @@ Dependencies:
 
 To install Bucklescript, run the following in this ("bs/") directory:
 
-    # Install node, npm, and ninja (as necessary)
+    # Install ocaml, node, npm, and ninja (as necessary)
+    sudo apt-get install ocaml
     sudo apt-get install nodejs
     sudo apt-get install npm
     sudo apt-get install ninja
