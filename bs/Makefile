@@ -8,7 +8,7 @@ parser:
 	ocamlyacc parser/Parser.mly
 	cp parser/*.ml .
 	cp parser/*.mli .
-	$(COMPILE) -bs-main calc.ml
+	$(COMPILE) Parse.ml
 
 clean:
 	rm *.js

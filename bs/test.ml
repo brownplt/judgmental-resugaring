@@ -2,65 +2,42 @@ open Util;;
 open Term;;
 open Grammar;;
 open TestRunner;;
-
-module StringNT =
-  struct
-    include String;;
-    let ord x = 1;;
-    let show s = s;;
-  end;;
-
-type nonterminal =
-  | DeclNT
-  | ExprNT
-  | BindsNT;;
-
-module Nonterminal =
-  struct
-    type t = nonterminal;;
-    let show s =
-      match s with
-      | DeclNT -> "Decl"
-      | ExprNT -> "Expr"
-      | BindsNT -> "Binds";;
-    let ord s =
-      match s with
-      | DeclNT -> 0
-      | ExprNT -> 1
-      | BindsNT -> 2;;
-  end
-
-module Grammar = Grammar(StringNT)(Nonterminal);;
 open Grammar;;
-open Term;;
+open Parse;;
   
 let gram =
   begin
-    let g = GrammarMap.create 10 in
-    GrammarMap.add
+    let g = Hashtbl.create 10 in
+    Hashtbl.add
       g
-      DeclNT
+      "Lit"
+      [PVal];
+    Hashtbl.add
+      g
+      "Decl"
       [PVar];
-    GrammarMap.add
+    Hashtbl.add
       g
-      ExprNT
+      "Expr"
       [PVar;
-       PVal("Num");
-       PStx("Let", [BindsNT; ExprNT])];
-    GrammarMap.add
+       PStx("Num", ["Lit"]);
+       PStx("Let", ["Binds"; "Expr"])];
+    Hashtbl.add
       g
-      BindsNT
+      "Binds"
       [PStx("End", []);
-       PStx("Bind", [DeclNT; ExprNT; BindsNT])];
+       PStx("Bind", ["Decl"; "Expr"; "Binds"])];
     g
   end;;
 
-let test_validate_succ (s: nonterminal) (t: 'v term): bool =
+let test_validate_succ (s: nonterminal) (t: string): bool =
+  let t = parse_term_s t in
   match validate gram t s with
   | Err _ -> false
   | Ok  _ -> true;;
 
-let test_validate_fail (s: nonterminal) (t: 'v term): bool =
+let test_validate_fail (s: nonterminal) (t: string): bool =
+  let t = parse_term_s t in
   match validate gram t s with
   | Err _ -> true
   | Ok  _ -> false;;
@@ -73,34 +50,19 @@ let tests =
            [TestGroup(
                 "Atomic",
                 [Test("Valid value",
-                      fun() -> test_validate_succ ExprNT (Val("Num", "0")));
+                      fun() -> test_validate_succ "Expr" "(Num '0')");
                  Test("Valid variable",
-                      fun() -> test_validate_succ ExprNT (Var("x")));
+                      fun() -> test_validate_succ "Expr" "x");
                  Test("Invalid value",
-                      fun() -> test_validate_fail ExprNT (Val("Str", "0")))]);
+                      fun() -> test_validate_fail "Expr" "(Str '0')")]);
             TestGroup(
                 "Terms",
                 [Test("Valid",
-                      fun() ->
-                      test_validate_succ
-                        ExprNT
-                        (Stx("Let", [Stx("Bind",
-                                         [Var("x"); Val("Num", "0"); Stx("End", [])]);
-                                     Var("x")])));
-                Test("Invalid1",
-                     fun() ->
-                     test_validate_fail
-                       ExprNT
-                       (Stx("Let", [Stx("Bind",
-                                        [Val("Num", "0"); Val("Num", "0"); Stx("End", [])]);
-                                    Var("x")])));
-                Test("Invalid2",
-                     fun() ->
-                     test_validate_fail
-                       ExprNT
-                       (Stx("Let", [Stx("Bind",
-                                        [Var("x"); Val("Num", "0"); Stx("End", [])]);
-                                    Stx("Bind",
-                                        [Var("x"); Val("Num", "0"); Stx("End", [])])])))])])]);;
-
+                      fun() -> test_validate_succ "Expr" "(Let (Bind x (Num '0') (End)) x)");
+                 Test("Invalid1",
+                      fun() -> test_validate_fail "Expr" "(Let (Bind (Num '0') (Num '0') (End)) x)");
+                 Test("Invalid",
+                      fun() -> test_validate_fail "Expr"
+                        "(Let (Bind x (Num '0') (End)) (Bind x (Num '0') (End)))")])])]);;
+  
 run_tests tests;;

@@ -15,3 +15,6 @@ Cargo.lock
 *.cmti
 *.js
 /bs/node_modules/
+Parser.ml
+Parser.mli
+Lexer.ml
