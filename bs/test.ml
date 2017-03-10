@@ -4,31 +4,13 @@ open Grammar;;
 open TestRunner;;
 open Grammar;;
 open Parse;;
-  
+
 let gram =
-  begin
-    let g = Hashtbl.create 10 in
-    Hashtbl.add
-      g
-      "Lit"
-      [PVal];
-    Hashtbl.add
-      g
-      "Decl"
-      [PVar];
-    Hashtbl.add
-      g
-      "Expr"
-      [PVar;
-       PStx("Num", ["Lit"]);
-       PStx("Let", ["Binds"; "Expr"])];
-    Hashtbl.add
-      g
-      "Binds"
-      [PStx("End", []);
-       PStx("Bind", ["Decl"; "Expr"; "Binds"])];
-    g
-  end;;
+  parse_grammar_s
+    "Lit = VALUE;
+     Decl = VARIABLE;
+     Expr = VARIABLE | (Num Lit) | (Let Binds Expr);
+     Binds = (End) | (Bind Decl Expr Binds);"
 
 let test_validate_succ (s: nonterminal) (t: string): bool =
   let t = parse_term_s t in
@@ -62,7 +44,7 @@ let tests =
                  Test("Invalid1",
                       fun() -> test_validate_fail "Expr" "(Let (Bind (Num '0') (Num '0') (End)) x)");
                  Test("Invalid",
-                      fun() -> test_validate_fail "Expr"
-                        "(Let (Bind x (Num '0') (End)) (Bind x (Num '0') (End)))")])])]);;
+                      fun() -> test_validate_fail "Expr" "(Let (Bind x (Num '0') (End))
+                                                               (Bind x (Num '0') (End)))")])])]);;
   
 run_tests tests;;

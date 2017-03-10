@@ -4,11 +4,17 @@
 }
 rule token = parse
     [' ' '\t' '\n' '\r']     { token lexbuf } (* whitespace *)
-  | '\'' [^ '\'']* '\'' as lxm  { LITERAL(lxm) }  (* TODO: string escapes *)
-  | ['a' - 'z' 'A' - 'Z' '_']+ as lxm { IDENTIFIER(lxm) }
   | '('                      { LPAREN }
   | ')'                      { RPAREN }
   | '{'                      { LBRACE }
   | '}'                      { RBRACE }
-  | "grammar"                { GRAMMAR }
+  | ';'                      { SEMICOLON }
+  | "grammar"                { LIT_GRAMMAR }
+  | "VALUE"                  { LIT_VALUE }
+  | "VARIABLE"               { LIT_VARIABLE }
+  | "="                      { EQUAL }
+  | "|"                      { PIPE }
   | eof                      { EOF }
+  | '\'' [^ '\'']* '\'' as lxm  { LITERAL(lxm) }  (* TODO: string escapes *)
+  | ['a' - 'z']['a' - 'z' 'A' - 'Z' '_']* as lxm { LID(lxm) }
+  | ['A' - 'Z']['a' - 'z' 'A' - 'Z' '_']* as lxm { UID(lxm) }
