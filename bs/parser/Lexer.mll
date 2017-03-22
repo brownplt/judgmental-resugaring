@@ -10,8 +10,10 @@ rule token = parse
   | '}'                      { RBRACE }
   | ';'                      { SEMICOLON }
   | "grammar"                { LIT_GRAMMAR }
+  | "rule"                   { LIT_RULE }
   | "VALUE"                  { LIT_VALUE }
   | "VARIABLE"               { LIT_VARIABLE }
+  | "=>"                     { ARROW }
   | "="                      { EQUAL }
   | "|"                      { PIPE }
   | eof                      { EOF }
