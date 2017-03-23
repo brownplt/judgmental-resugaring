@@ -15,8 +15,9 @@ type context =
 
 let rec show_term (t: term): string =
   match t with
-  | Val(v)        -> Printf.sprintf "\"%s\"" v (* TODO: string escapes *)
+  | Val(v)        -> Printf.sprintf "'%s'" v (* TODO: string escapes *)
   | Var(var)      -> var
+  | Stx(head, []) -> Printf.sprintf "(%s)" head
   | Stx(head, ts) -> Printf.sprintf "(%s %s)" head (show_terms ts)
 and show_terms (ts: term list): string =
   match ts with
@@ -35,6 +36,7 @@ let rec show_context (t: context): string =
   | CVal(v)        -> Printf.sprintf "\"%s\"" v (* TODO: string escapes *)
   | CVar(var)      -> var
   | CHole(var)     -> var
+  | CStx(head, []) -> Printf.sprintf "(%s)" head
   | CStx(head, ts) -> Printf.sprintf "(%s %s)" head (show_contexts ts)
 and show_contexts (ts: context list): string =
   match ts with

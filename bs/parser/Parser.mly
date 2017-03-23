@@ -20,9 +20,9 @@
 %type <Term.term> term
 %start grammar
 %type <Grammar.grammar> grammar
-%start rules
-%type <Desugar.rule list> rules
-%type <Desugar.rule> rule
+%start ds_rules
+%type <Desugar.rule list> ds_rules
+%type <Desugar.rule> ds_rule
 %type <Term.context> context
 %type <Grammar.grammar> grammar_rules
 %type <string * Grammar.production list> grammar_rule
@@ -32,11 +32,11 @@
 %type <string> grammar_nt
 %%
 
-rules:
+ds_rules:
   | { [] }
-  | rule rules { $1 :: $2 }
+  | ds_rule ds_rules { $1 :: $2 }
 ;
-rule:
+ds_rule:
   | LIT_RULE context ARROW context {
     Desugar.Rule ($2, $4)
   }

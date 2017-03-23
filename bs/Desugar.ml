@@ -5,7 +5,7 @@ type rule =
 
 type environment = (string, term) Hashtbl.t;;
 
-let rewrite (t: term) (rs: rule list): term option =
+let desugar (rs: rule list) (t: term): term =
   
   let rec matches (t: term) (ctx: context): bool =
     match (t, ctx) with
@@ -31,7 +31,7 @@ let rewrite (t: term) (rs: rule list): term option =
     | CVar(v)       -> Var(v)
     | CStx(s, ctxs) -> Stx(s, List.map (substitute env) ctxs) in
 
-  let rec recur (rs: rule list): term option =
+  let rec rewrite (rs: rule list) (t: term): term option =
     match rs with
     | []                     -> None
     | (Rule(lhs, rhs) :: rs) ->
@@ -39,6 +39,14 @@ let rewrite (t: term) (rs: rule list): term option =
        then let env = Hashtbl.create 0 in
             bind env t lhs;
             Some(substitute env rhs)
-       else recur rs in
+       else rewrite rs t in
 
-  recur rs
+  let rec rewrites (t: term): term =
+    match rewrite rs t with
+    | Some(t) -> rewrites t
+    | None ->
+       match t with
+       | Stx(s, ts) -> Stx(s, List.map rewrites ts)
+       | t          -> t in
+  
+  rewrites t
