@@ -24,7 +24,7 @@ let ds_rules =
        => (DsLet Bs Body (Param X Params) (Arg Defn Args))
      rule (DsLet (End) Body Params Args)
        => (Apply (Lambda Params Body) Args)";;
-    
+
 let test_desugar (t: string) (exp: string): bool =
   let t = parse_term_s t in
   let exp = parse_term_s exp in

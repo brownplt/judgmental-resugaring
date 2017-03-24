@@ -18,3 +18,9 @@ let parse_ds_rules (buf: Lexing.lexbuf): Desugar.rule list =
 
 let parse_ds_rules_s (s: string): Desugar.rule list =
   parse_ds_rules (Lexing.from_string s);;
+
+let parse_judgments (buf: Lexing.lexbuf): Judgment.judgment list =
+  Parser.judgments Lexer.token buf;;
+
+let parse_judgments_s (s: string): Judgment.judgment list =
+  parse_judgments (Lexing.from_string s);;
