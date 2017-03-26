@@ -24,6 +24,23 @@ let ds_rules =
        => (DsLet Bs Body (Param X Params) (Arg Defn Args))
      rule (DsLet (End) Body Params Args)
        => (Apply (Lambda Params Body) Args)";;
+
+let gram_let =
+  parse_grammar_s
+    "Lit = VALUE;
+     Decl = VARIABLE;
+     Expr = VARIABLE
+          | (Num Lit)
+          | (Let Decl Type Expr Expr)
+          | (Lambda Decl Type Expr)
+          | (Apply Expr Expr);
+     Type = (TNum)
+          | (TFun Type Type);";;
+
+let ds_let =
+  parse_ds_rules_s
+    "rule (Let X A B)
+       => (Apply (Lambda X B) A)";;
     
 let test_desugar (t: string) (exp: string): bool =
   let t = parse_term_s t in
