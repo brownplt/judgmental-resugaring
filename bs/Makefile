@@ -4,6 +4,8 @@ all:
 	$(COMPILE) Util.ml
 	$(COMPILE) Term.ml
 	$(COMPILE) Grammar.ml
+	$(COMPILE) Desugar.ml
+	$(COMPILE) Judgment.ml
 	ocamllex parser/Lexer.mll
 	ocamlyacc parser/Parser.mly
 	cp parser/*.ml .

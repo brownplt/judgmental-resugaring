@@ -9,14 +9,16 @@ rule token = parse
   | '{'                      { LBRACE }
   | '}'                      { RBRACE }
   | ';'                      { SEMICOLON }
-  | "grammar"                { LIT_GRAMMAR }
-  | "rule"                   { LIT_RULE }
-  | "VALUE"                  { LIT_VALUE }
-  | "VARIABLE"               { LIT_VARIABLE }
   | "=>"                     { ARROW }
   | "="                      { EQUAL }
   | "|"                      { PIPE }
+  | ","                      { COMMA }
   | eof                      { EOF }
+  | "grammar"                { LIT_GRAMMAR }
+  | "rule"                   { LIT_RULE }
+  | "judgment"               { LIT_JUDGMENT }
+  | "VALUE"                  { LIT_VALUE }
+  | "VARIABLE"               { LIT_VARIABLE }
   | '\'' [^ '\'']* '\'' as lxm  { LITERAL(lxm) }  (* TODO: string escapes *)
   | ['a' - 'z']['a' - 'z' 'A' - 'Z' '_']* as lxm { LID(lxm) }
   | ['A' - 'Z']['a' - 'z' 'A' - 'Z' '_']* as lxm { UID(lxm) }

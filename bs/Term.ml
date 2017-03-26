@@ -43,8 +43,3 @@ and show_contexts (ts: context list): string =
   | []    -> ""
   | [t]   -> show_context t
   | t::ts -> Printf.sprintf "%s %s" (show_context t) (show_contexts ts);;
-  
-let go msg =
-  print_endline msg;;
-
-let plus(x, y) = x + y;;

@@ -14,7 +14,7 @@ let gram =
           | (DsLet Binds Expr Params Args);
      Args = (End) | (Arg Expr Args);
      Params = (End) | (Param Decl Params);
-     Binds = (End) | (Bind Decl Expr Binds);"
+     Binds = (End) | (Bind Decl Expr Binds);";;
 
 let ds_rules =
   parse_ds_rules_s

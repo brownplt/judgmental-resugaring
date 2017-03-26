@@ -4,17 +4,22 @@
 %token <string> LITERAL
 %token <string> LID
 %token <string> UID
+
 %token LPAREN RPAREN
 %token LBRACE RBRACE
 %token SEMICOLON
-%token LIT_GRAMMAR
-%token LIT_VALUE
-%token LIT_VARIABLE
-%token LIT_RULE
+%token COMMA
 %token ARROW
 %token EQUAL
 %token PIPE
 %token EOF
+
+%token LIT_GRAMMAR
+%token LIT_RULE
+%token LIT_JUDGMENT
+%token LIT_VALUE
+%token LIT_VARIABLE
+
 
 %start term
 %type <Term.term> term
@@ -23,6 +28,10 @@
 %start ds_rules
 %type <Desugar.rule list> ds_rules
 %type <Desugar.rule> ds_rule
+%start judgments
+%type <Judgment.judgment list> judgments
+%type <Judgment.judgment> judgment
+%type <Term.context list> judgment_premises
 %type <Term.context> context
 %type <Grammar.grammar> grammar_rules
 %type <string * Grammar.production list> grammar_rule
@@ -31,6 +40,25 @@
 %type <string list> grammar_nts
 %type <string> grammar_nt
 %%
+
+judgments:
+  | { [] }
+  | judgment judgments { $1 :: $2 }
+;
+judgment:
+  | LIT_JUDGMENT judgment_premises ARROW context {
+    Judgment.Judgment($2, $4)
+  }
+  | LIT_JUDGMENT context {
+    Judgment.Judgment([], $2)
+  }
+;
+judgment_premises:
+  | context { [$1] }
+  | context COMMA judgment_premises {
+    $1 :: $3
+  }
+;
 
 ds_rules:
   | { [] }
