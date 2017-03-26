@@ -11,12 +11,16 @@
 %token COMMA
 %token ARROW
 %token EQUAL
+%token TURNSTILE
+%token COLON
 %token PIPE
 %token EOF
 
 %token LIT_GRAMMAR
 %token LIT_RULE
 %token LIT_JUDGMENT
+%token LIT_EMPTY
+
 %token LIT_VALUE
 %token LIT_VARIABLE
 
@@ -28,10 +32,12 @@
 %start ds_rules
 %type <Desugar.rule list> ds_rules
 %type <Desugar.rule> ds_rule
-%start judgments
+%start inference_rules
+%type <Judgment.inference_rule list> inference_rules
+%type <Judgment.inference_rule> inference_rule
 %type <Judgment.judgment list> judgments
 %type <Judgment.judgment> judgment
-%type <Term.context list> judgment_premises
+%type <Judgment.environment> environment
 %type <Term.context> context
 %type <Grammar.grammar> grammar_rules
 %type <string * Grammar.production list> grammar_rule
@@ -41,22 +47,39 @@
 %type <string> grammar_nt
 %%
 
+inference_rules:
+  | { [] }
+  | inference_rule inference_rules { $1 :: $2 }
+;
+inference_rule:
+  | LIT_RULE judgment {
+    Judgment.InferenceRule([], $2)
+  }
+  | LIT_RULE judgments ARROW judgment {
+    Judgment.InferenceRule($2, $4)
+  }
+;
 judgments:
   | { [] }
   | judgment judgments { $1 :: $2 }
 ;
 judgment:
-  | LIT_JUDGMENT judgment_premises ARROW context {
-    Judgment.Judgment($2, $4)
-  }
-  | LIT_JUDGMENT context {
-    Judgment.Judgment([], $2)
+  | environment TURNSTILE context COLON context {
+    Judgment.Judgment($1, $3, $5)
   }
 ;
-judgment_premises:
-  | context { [$1] }
-  | context COMMA judgment_premises {
-    $1 :: $3
+environment:
+  | LIT_EMPTY {
+    Judgment.EnvEmpty()
+  }
+  | LID {
+    Judgment.EnvHole(Term.new_mvar($1))
+  }
+  | LID COLON context {
+    Judgment.EnvCons(Term.new_mvar($1), $3, Judgment.EnvEmpty())
+  }
+  | LID COLON context COMMA environment {
+    Judgment.EnvCons(Term.new_mvar($1), $3, $5)
   }
 ;
 
@@ -129,10 +152,10 @@ context:
     Term.CVal(String.sub s 1 (String.length(s) - 2))
   }
   | LID {
-    Term.CVar($1)
+    Term.CHole(Term.new_mvar($1))
   }
   | UID {
-    Term.CHole($1)
+    Term.CVar($1)
   }
   | LPAREN UID contexts RPAREN {
     Term.CStx($2, $3)

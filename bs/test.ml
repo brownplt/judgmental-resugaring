@@ -6,27 +6,30 @@ open Grammar;;
 open Desugar;;
 open Parse;;
 
+(* Bucklescript bug! *)
+Printf.printf "\n\n! %d !\n\n" (parse_term_s 2 3);;
+
 let gram =
-  parse_grammar_s
+  parse_grammar_s "example_grammar"
     "Lit = VALUE;
      Decl = VARIABLE;
      Expr = VARIABLE | (Num Lit) | (Let Binds Expr) | (Lambda Params Expr)
           | (DsLet Binds Expr Params Args);
      Args = (End) | (Arg Expr Args);
      Params = (End) | (Param Decl Params);
-     Binds = (End) | (Bind Decl Expr Binds);";;
+     Binds = (End) | (Bind Decl Expr Binds);" ;;
 
 let ds_rules =
-  parse_ds_rules_s
-    "rule (Let Bs B)
-       => (DsLet Bs B (End) (End))
-     rule (DsLet (Bind X Defn Bs) Body Params Args)
-       => (DsLet Bs Body (Param X Params) (Arg Defn Args))
-     rule (DsLet (End) Body Params Args)
-       => (Apply (Lambda Params Body) Args)";;
+  parse_ds_rules_s "example_desugaring"
+    "rule (Let bs b)
+       => (DsLet bs b (End) (End))
+     rule (DsLet (Bind x defn bs) body params args)
+       => (DsLet bs body (Param x params) (Arg defn args))
+     rule (DsLet (End) body params args)
+       => (Apply (Lambda params body) args)";;
 
 let gram_let =
-  parse_grammar_s
+  parse_grammar_s "let_grammar"
     "Lit = VALUE;
      Decl = VARIABLE;
      Expr = VARIABLE
@@ -34,27 +37,38 @@ let gram_let =
           | (Let Decl Type Expr Expr)
           | (Lambda Decl Type Expr)
           | (Apply Expr Expr);
+     Judge = (Judge Ctx Expr Type);
+     Ctx = (CtxEmpty)
+         | (CtxCons Decl Type Ctx);
      Type = (TNum)
           | (TFun Type Type);";;
 
 let ds_let =
-  parse_ds_rules_s
+  parse_ds_rules_s "let_desugaring"
     "rule (Let X A B)
        => (Apply (Lambda X B) A)";;
-    
+
+let judge_let =
+  parse_inference_rules_s "let_inference_rules"
+    "rule x: s, g |- e : t
+       => g |- (Lambda x s e) : t
+     rule g |- f : (TFun s t)
+          g |- e : s
+       => g |- (Apply f e) : t";;
+
 let test_desugar (t: string) (exp: string): bool =
-  let t = parse_term_s t in
-  let exp = parse_term_s exp in
+  let t = parse_term_s1 "<test>" t in
+  let exp = parse_term_s1 "<test>" exp in
   desugar ds_rules t = exp
 
 let test_validate_succ (s: nonterminal) (t: string): bool =
-  let t = parse_term_s t in
+  let t = parse_term_s1 "<test>" t in
   match validate gram t s with
   | Err _ -> false
   | Ok  _ -> true;;
 
 let test_validate_fail (s: nonterminal) (t: string): bool =
-  let t = parse_term_s t in
+  let t = parse_term_s1 "<test>" t in
   match validate gram t s with
   | Err _ -> true
   | Ok  _ -> false;;

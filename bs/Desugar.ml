@@ -17,7 +17,7 @@ let desugar (rs: rule list) (t: term): term =
   
   let rec bind (env: environment) (t: term) (ctx: context) =
     match (t, ctx) with
-    | (t, CHole(v))                  -> Hashtbl.add env v t
+    | (t, CHole(MVar(v, _)))         -> Hashtbl.add env v t
     | (Val(_), CVal(_))              -> ()
     | (Stx(_, terms), CStx(_, ctxs)) -> List.iter2 (bind env) terms ctxs
     | (_, _) -> failwith "Internal error in Desugar/bind" in
@@ -26,10 +26,10 @@ let desugar (rs: rule list) (t: term): term =
   (* Requires that env contain bindings for all holes in ctx. *)
   let rec substitute (env: environment) (ctx: context): term =
     match ctx with
-    | CHole(v)      -> Hashtbl.find env v
-    | CVal(l)       -> Val(l)
-    | CVar(v)       -> Var(v)
-    | CStx(s, ctxs) -> Stx(s, List.map (substitute env) ctxs) in
+    | CHole(MVar(v, _)) -> Hashtbl.find env v
+    | CVal(l)           -> Val(l)
+    | CVar(v)           -> Var(v)
+    | CStx(s, ctxs)     -> Stx(s, List.map (substitute env) ctxs) in
 
   let rec rewrite (rs: rule list) (t: term): term option =
     match rs with

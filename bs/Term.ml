@@ -1,6 +1,9 @@
 open Format;;
-  
+
 type var = string;;
+
+type mvar =
+  | MVar of string * int;;
 
 type term =
   | Val of string
@@ -9,9 +12,16 @@ type term =
 
 type context =
   | CVal of string
-  | CHole of var
+  | CHole of mvar
   | CVar of var
   | CStx of string * context list;;
+
+let new_mvar (name: string): mvar =
+  MVar(name, 0);;
+
+let show_mvar (var: mvar): string =
+  match var with
+  | MVar(name, _) -> name;;
 
 let rec show_term (t: term): string =
   match t with
@@ -35,7 +45,7 @@ let rec show_context (t: context): string =
   match t with
   | CVal(v)        -> Printf.sprintf "\"%s\"" v (* TODO: string escapes *)
   | CVar(var)      -> var
-  | CHole(var)     -> var
+  | CHole(var)     -> show_mvar var
   | CStx(head, []) -> Printf.sprintf "(%s)" head
   | CStx(head, ts) -> Printf.sprintf "(%s %s)" head (show_contexts ts)
 and show_contexts (ts: context list): string =

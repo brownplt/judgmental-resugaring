@@ -1,26 +1,42 @@
+open Lexing;;
+open Parsing;;
 open Term;;
+open Lexer;;
 open Parser;;
 
-let parse_term (buf: Lexing.lexbuf): Term.term =
-  Parser.term Lexer.token buf;;
+exception Exit of unit;;
 
-let parse_term_s (s: string): Term.term =
-  parse_term (Lexing.from_string s);;
+let show_pos lexbuf =
+  let pos = lexbuf.lex_curr_p in
+  Printf.sprintf "  File: %s\n  Line: %d\n  Column: %d\n"
+         pos.pos_fname
+         pos.pos_lnum
+         (pos.pos_cnum - pos.pos_bol + 1);;
 
-let parse_grammar (buf: Lexing.lexbuf): Grammar.grammar =
-  Parser.grammar Lexer.token buf;;
+type 'a t_parser = (Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> 'a;;
 
-let parse_grammar_s (s: string): Grammar.grammar =
-  parse_grammar (Lexing.from_string s);;
+let parse ((p, filename, buf) : 'a t_parser * string * Lexing.lexbuf): 'a =
+  let pos = buf.lex_curr_p in
+  buf.lex_curr_p <- { pos with pos_fname = filename };
+  try p Lexer.token buf with
+  | SyntaxError msg ->
+     Printf.fprintf stderr "\n%s:\n%s" msg (show_pos buf);
+     raise(Exit())
+  | Parsing.Parse_error ->
+     Printf.fprintf stderr "\nSyntax error:\n%s" (show_pos buf);
+     raise(Exit());;
 
-let parse_ds_rules (buf: Lexing.lexbuf): Desugar.rule list =
-  Parser.ds_rules Lexer.token buf;;
+let parse_s ((p, filename, s): 'a t_parser * string * string): 'a =
+  parse(p, filename, Lexing.from_string s);;
 
-let parse_ds_rules_s (s: string): Desugar.rule list =
-  parse_ds_rules (Lexing.from_string s);;
+let parse_term f buf = parse(Parser.term, f, buf);;
+let parse_term_s1 f s = parse_s(Parser.term, f, s);;
+let parse_grammar f buf = parse(Parser.grammar, f, buf);;
+let parse_grammar_s f s = parse_s(Parser.grammar, f, s);;
+let parse_ds_rules f buf = parse(Parser.ds_rules, f, buf);;
+let parse_ds_rules_s f s = parse_s(Parser.ds_rules, f, s);;
+let parse_inference_rules f buf = parse(Parser.inference_rules, f, buf);;
+let parse_inference_rules_s f s = parse_s(Parser.inference_rules, f, s);;
 
-let parse_judgments (buf: Lexing.lexbuf): Judgment.judgment list =
-  Parser.judgments Lexer.token buf;;
-
-let parse_judgments_s (s: string): Judgment.judgment list =
-  parse_judgments (Lexing.from_string s);;
+(* Bucklescript bug! *)
+let parse_term_s a b = a + b;;
