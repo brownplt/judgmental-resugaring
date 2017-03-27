@@ -19,6 +19,29 @@ type context =
 let new_mvar (name: string): mvar =
   MVar(name, 0);;
 
+
+(* Freshening *)
+
+let next_fresh_id = ref 0;;
+
+let fresh_id(): int =
+  next_fresh_id := !next_fresh_id + 1;
+  !next_fresh_id;;
+
+let freshen_mvar (v: mvar): mvar =
+  match v with
+  | MVar(name, id) -> MVar(name, fresh_id());;
+
+let rec freshen_context (c: context): context =
+  match c with
+  | CVal(_)        -> c
+  | CVar(_)        -> c
+  | CHole(v)       -> CHole(freshen_mvar(v))
+  | CStx(head, cs) -> CStx(head, List.map freshen_context cs);;
+
+
+(* Printing *)
+
 let show_mvar (var: mvar): string =
   match var with
   | MVar(name, _) -> name;;

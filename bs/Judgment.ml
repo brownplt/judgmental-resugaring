@@ -13,6 +13,28 @@ type judgment =
 type inference_rule =
   | InferenceRule of judgment list * judgment;;
 
+
+(* Freshening *)
+
+let rec freshen_env(env: environment): environment =
+  match env with
+  | EnvEmpty()         -> EnvEmpty()
+  | EnvHole(v)         -> EnvHole(freshen_mvar(v))
+  | EnvCons(v, t, env) -> EnvCons(freshen_mvar(v), freshen_context(t), freshen_env(env));;
+
+let freshen_judgment (j: judgment): judgment =
+  match j with
+  | Judgment(env, lhs, rhs) ->
+     Judgment(freshen_env(env), freshen_context(lhs), freshen_context(rhs));;
+
+let freshen_inference_rule (r: inference_rule): inference_rule =
+  match r with
+  | InferenceRule(ps, c) ->
+     InferenceRule(List.map freshen_judgment ps, freshen_judgment(c));;
+
+
+(* Printing *)
+
 let rec show_environment (env: environment): string =
   match env with
   | EnvEmpty()         -> "empty"

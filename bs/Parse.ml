@@ -30,13 +30,10 @@ let parse_s ((p, filename, s): 'a t_parser * string * string): 'a =
   parse(p, filename, Lexing.from_string s);;
 
 let parse_term f buf = parse(Parser.term, f, buf);;
-let parse_term_s1 f s = parse_s(Parser.term, f, s);;
+let parse_term_s f s = parse_s(Parser.term, f, s);;
 let parse_grammar f buf = parse(Parser.grammar, f, buf);;
 let parse_grammar_s f s = parse_s(Parser.grammar, f, s);;
 let parse_ds_rules f buf = parse(Parser.ds_rules, f, buf);;
 let parse_ds_rules_s f s = parse_s(Parser.ds_rules, f, s);;
 let parse_inference_rules f buf = parse(Parser.inference_rules, f, buf);;
 let parse_inference_rules_s f s = parse_s(Parser.inference_rules, f, s);;
-
-(* Bucklescript bug! *)
-let parse_term_s a b = a + b;;

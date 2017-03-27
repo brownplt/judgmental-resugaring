@@ -5,9 +5,7 @@ open TestRunner;;
 open Grammar;;
 open Desugar;;
 open Parse;;
-
-(* Bucklescript bug! *)
-Printf.printf "\n\n! %d !\n\n" (parse_term_s 2 3);;
+open Infer;;
 
 let gram =
   parse_grammar_s "example_grammar"
@@ -57,18 +55,18 @@ let judge_let =
        => g |- (Apply f e) : t";;
 
 let test_desugar (t: string) (exp: string): bool =
-  let t = parse_term_s1 "<test>" t in
-  let exp = parse_term_s1 "<test>" exp in
+  let t = parse_term_s "<test>" t in
+  let exp = parse_term_s "<test>" exp in
   desugar ds_rules t = exp
 
 let test_validate_succ (s: nonterminal) (t: string): bool =
-  let t = parse_term_s1 "<test>" t in
+  let t = parse_term_s "<test>" t in
   match validate gram t s with
   | Err _ -> false
   | Ok  _ -> true;;
 
 let test_validate_fail (s: nonterminal) (t: string): bool =
-  let t = parse_term_s1 "<test>" t in
+  let t = parse_term_s "<test>" t in
   match validate gram t s with
   | Err _ -> true
   | Ok  _ -> false;;
