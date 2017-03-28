@@ -13,6 +13,9 @@ type judgment =
 type inference_rule =
   | InferenceRule of judgment list * judgment;;
 
+type derivation =
+  | Derivation of judgment * derivation list;;
+
 
 (* Freshening *)
 
@@ -24,8 +27,8 @@ let rec freshen_env(env: environment): environment =
 
 let freshen_judgment (j: judgment): judgment =
   match j with
-  | Judgment(env, lhs, rhs) ->
-     Judgment(freshen_env(env), freshen_context(lhs), freshen_context(rhs));;
+  | Judgment(env, e, t) ->
+     Judgment(freshen_env(env), freshen_context(e), freshen_context(t));;
 
 let freshen_inference_rule (r: inference_rule): inference_rule =
   match r with
