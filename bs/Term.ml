@@ -40,6 +40,14 @@ let rec freshen_context (c: context): context =
   | CStx(head, cs) -> CStx(head, List.map freshen_context cs);;
 
 
+(* Checking if Atomic *)
+
+let atomic_context (c: context): bool =
+  match c with
+  | CHole(_) -> true
+  | _ -> false;;
+
+
 (* Printing *)
 
 let show_mvar (var: mvar): string =

@@ -83,6 +83,10 @@ let expand_judgment (m: mapping) (j: judgment): judgment =
   | Judgment(env, e, t) ->
      Judgment(expand_environment m env, expand_context m e, expand_context m t);;
 
+let rec expand_derivation (m: mapping) (d: derivation): derivation =
+  let Derivation(premises, conclusion) = d in
+  Derivation(List.map (expand_derivation m) premises, expand_judgment m conclusion);;
+
 
 (* Matching *)
 
@@ -171,8 +175,15 @@ let rec derive_tree (rules: inference_rule list) (m: mapping) (j: judgment): der
     | (r :: rs) ->
        match derive_premises m j r with
        | None -> recur rs
-       | Some(premises) -> Derivation(j, List.map (derive_tree rules m) premises) in
-  recur (List.map freshen_inference_rule rules);;
+       | Some(premises) -> Derivation(List.map (derive_tree rules m) premises, j)
+  in
+  if atomic_judgment j
+  then Derivation([], j)
+  else recur (List.map freshen_inference_rule rules);;
 
 let infer (rules: inference_rule list) (j: judgment): derivation =
-  derive_tree rules (new_mapping()) j;;
+  let m = new_mapping() in
+  let d = derive_tree rules m j in
+  let Mapping(a, b, c) = m in
+  Printf.printf "DEBUG %d\n" (Hashtbl.length a + Hashtbl.length b + Hashtbl.length c);
+  expand_derivation m d;;

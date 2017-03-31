@@ -5,6 +5,7 @@ open TestRunner;;
 open Grammar;;
 open Desugar;;
 open Parse;;
+open Judgment;;
 open Infer;;
 
 let gram =
@@ -43,8 +44,8 @@ let gram_let =
 
 let ds_let =
   parse_ds_rules_s "let_desugaring"
-    "rule (Let X A B)
-       => (Apply (Lambda X B) A)";;
+    "rule (Let x t a b)
+       => (Apply (Lambda x t b) a)";;
 
 let judge_let =
   parse_inference_rules_s "let_inference_rules"
@@ -54,10 +55,20 @@ let judge_let =
           g |- e : s
        => g |- (Apply f e) : t";;
 
+let test_infer (ds: rule) (rs: inference_rule list): bool =
+  match ds with
+  | Rule(lhs, rhs) ->
+     (* [TODO]: hygiene *)
+     let j = Judgment(EnvHole(new_mvar("g")), rhs, CHole(new_mvar("t"))) in
+     let j = freshen_judgment(j) in
+     let deriv = infer rs j in
+     Printf.printf "\nInferred:\n%s\n\n" (show_derivation deriv);
+     true;;
+
 let test_desugar (t: string) (exp: string): bool =
   let t = parse_term_s "<test>" t in
   let exp = parse_term_s "<test>" exp in
-  desugar ds_rules t = exp
+  desugar ds_rules t = exp;;
 
 let test_validate_succ (s: nonterminal) (t: string): bool =
   let t = parse_term_s "<test>" t in
@@ -98,6 +109,10 @@ let tests =
            [Test("Valid",
                  fun() -> test_desugar
                             "(Let (Bind x (Num '1') (End)) x)"
-                            "(Apply (Lambda (Param x (End)) x) (Arg (Num '1') (End)))")])]);;
+                            "(Apply (Lambda (Param x (End)) x) (Arg (Num '1') (End)))")]);
+       TestGroup(
+           "Inference",
+           [Test("Let",
+                 fun() -> test_infer (List.hd ds_let) judge_let)])]);;
   
 run_tests tests;;
