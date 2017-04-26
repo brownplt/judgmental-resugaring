@@ -10,9 +10,9 @@ let desugar (rs: rule list) (t: term): term =
   let rec matches (t: term) (ctx: context): bool =
     match (t, ctx) with
     | (_, CHole(_))                  -> true
-    | (Val(a), CVal(b))              -> a == b
+    | (Val(a), CVal(b))              -> a = b
     | (Stx(a, terms), CStx(b, ctxs)) ->
-       (a == b) && (List.for_all2 matches terms ctxs)
+       (a = b) && (List.for_all2 matches terms ctxs)
     | (_, _) -> false in
   
   let rec bind (env: environment) (t: term) (ctx: context) =

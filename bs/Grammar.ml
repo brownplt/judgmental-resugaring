@@ -37,7 +37,7 @@ let validate (g: grammar) (t: term) (s: nonterminal): (unit, string) result =
     | [p] -> validate_prod t p
     | ps ->
        match or_result (validate_prod t) ps with
-       | Err ()  -> Err(nonterminal_error t s)
+       | Err ()  -> Err (nonterminal_error t s)
        | Ok  _   -> Ok ()
 
   and validate_prod (t: term) (p: production): (unit, string) result =
@@ -45,8 +45,8 @@ let validate (g: grammar) (t: term) (s: nonterminal): (unit, string) result =
     | (Val(_), PVal) -> Ok ()
     | (Var _, PVar)  -> Ok ()
     | (Stx(head_found, ts), PStx(head_expected, ss))
-         when head_expected == head_found
-              && List.length ss == List.length ts ->
+         when head_expected = head_found
+              && List.length ss = List.length ts ->
        (match and_result2 validate_nonterminal ts ss with
         | Err msg -> Err msg
         | Ok  _   -> Ok ())

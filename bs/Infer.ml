@@ -1,12 +1,13 @@
 open Util;;
 open Term;;
 open Judgment;;
+open Fresh;;
 
 
 type mapping =
   | Mapping of (int, context) Hashtbl.t * (int, mvar) Hashtbl.t * (int, environment) Hashtbl.t;;
 
-
+  
 (* Basic Helpers [TODO]: make private *)
 
 let new_mapping (): mapping =
@@ -42,17 +43,21 @@ let lookup_context (m: mapping) (v: mvar): context option =
 let insert_in_mapping (m: (int, 'a) Hashtbl.t) (v: mvar) (value: 'a) =
   let MVar(name, id) = v in
   if Hashtbl.mem m id
-  then internal_error (Printf.sprintf "bind_in_mapping - variable %s{%d} already bound" name id)
+  then internal_error (Printf.sprintf "bind_in_mapping - variable %s_%s already bound" name (string_of_int id))
   else Hashtbl.add m id value;;
 
 let insert_environment (m: mapping) (v: mvar) (env: environment) =
   insert_in_mapping (environment_mapping m) v env;;
 
 let insert_var (m: mapping) (v: mvar) (x: mvar) =
-  insert_in_mapping (var_mapping m) v x;;
+  if v = x
+  then ()
+  else insert_in_mapping (var_mapping m) v x;;
 
 let insert_context (m: mapping) (v: mvar) (c: context) =
-  insert_in_mapping (context_mapping m) v c;;
+  if CHole(v) = c
+  then ()
+  else insert_in_mapping (context_mapping m) v c;;
 
 
 (* Expansion *)
@@ -99,9 +104,9 @@ let rec matches_context (m: mapping) (c1: context) (c2: context): bool =
       | None -> true
       | Some(c2) -> matches_context m c1 c2)
   | (CHole(_), _) -> false
-  | (CVal(a), CVal(b)) -> a == b
+  | (CVal(a), CVal(b)) -> a = b
   | (CStx(a, ca), CStx(b, cb)) ->
-     (a == b) && List.for_all2 (matches_context m) ca cb
+     (a = b) && List.for_all2 (matches_context m) ca cb
   | (_, _) -> false;;
 
 let rec matches_environment (m: mapping) (env1: environment) (env2: environment): bool =
@@ -157,6 +162,19 @@ let bind_judgment (m: mapping) (j1: judgment) (j2: judgment) =
      bind_context m t1 t2;;
 
 
+(* Expansion Inference Rules *)
+
+let rec add_expansion_rules
+          (inf_rules: inference_rule list)
+          (ds_rules: Desugar.rule list):
+          inference_rule list =
+  match ds_rules with
+  | [] -> inf_rules
+  | (Desugar.Rule(lhs, rhs) :: ds_rules) ->
+     let new_rule = InferenceRule([generic_judgment(rhs)], generic_judgment(lhs)) in
+     add_expansion_rules (new_rule :: inf_rules) ds_rules;;
+
+  
 (* Inference *)
 
 (* Assumes that r has been freshened. *)
@@ -171,19 +189,34 @@ let derive_premises (m: mapping) (j: judgment) (r: inference_rule): judgment lis
 let rec derive_tree (rules: inference_rule list) (m: mapping) (j: judgment): derivation =
   let rec recur (rs: inference_rule list): derivation =
     match rs with
-    | [] -> error (Printf.sprintf "No derivation found for %s" (show_judgment j))
+    | [] ->
+       error (Printf.sprintf "No derivation found for %s\n" (show_judgment j))
     | (r :: rs) ->
        match derive_premises m j r with
        | None -> recur rs
-       | Some(premises) -> Derivation(List.map (derive_tree rules m) premises, j)
+       | Some(premises) ->
+          debug (Printf.sprintf "applying rule %s" (show_inference_rule r));
+          Derivation(List.map (derive_tree rules m) premises, j)
   in
   if atomic_judgment j
   then Derivation([], j)
-  else recur (List.map freshen_inference_rule rules);;
+            else recur (List.map freshen_inference_rule rules);;
 
 let infer (rules: inference_rule list) (j: judgment): derivation =
+  debug (Printf.sprintf "infer: %s\n" (show_judgment j));
   let m = new_mapping() in
   let d = derive_tree rules m j in
-  let Mapping(a, b, c) = m in
-  Printf.printf "DEBUG %d\n" (Hashtbl.length a + Hashtbl.length b + Hashtbl.length c);
-  expand_derivation m d;;
+  let ans = expand_derivation m d in
+  ans;;
+
+let resugar (inf_rules: inference_rule list) (ds_rules: Desugar.rule list): derivation list =
+  debug "resugar:";
+  let inf_rules = add_expansion_rules inf_rules ds_rules in
+  debug (show_inference_rules inf_rules);
+  let resugar_rule rule =
+    match rule with
+    | Desugar.Rule(lhs, _) -> 
+       infer inf_rules (freshen_judgment (generic_judgment lhs))
+  in
+  let ans = List.map resugar_rule ds_rules in
+  ans;;

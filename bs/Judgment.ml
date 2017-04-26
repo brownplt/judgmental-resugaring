@@ -1,6 +1,6 @@
 open Format;;
 open Term;;
-
+  
 (* [TODO]: EnvCons where the variable name is a constant *)
 type environment =
   | EnvEmpty of unit
@@ -17,30 +17,16 @@ type derivation =
   | Derivation of derivation list * judgment;;
 
 
-(* Freshening *)
-
-let rec freshen_env (env: environment): environment =
-  match env with
-  | EnvEmpty()         -> EnvEmpty()
-  | EnvHole(v)         -> EnvHole(freshen_mvar(v))
-  | EnvCons(v, t, env) -> EnvCons(freshen_mvar(v), freshen_context(t), freshen_env(env));;
-
-let freshen_judgment (j: judgment): judgment =
-  match j with
-  | Judgment(env, e, t) ->
-     Judgment(freshen_env(env), freshen_context(e), freshen_context(t));;
-
-let freshen_inference_rule (r: inference_rule): inference_rule =
-  match r with
-  | InferenceRule(ps, c) ->
-     InferenceRule(List.map freshen_judgment ps, freshen_judgment(c));;
-
 
 (* Checking if Atomic *)
 
 let atomic_judgment (j: judgment): bool =
   let Judgment(_, e, _) = j in
   atomic_context e;;
+
+let generic_judgment (ctx: context): judgment =
+  (* [TODO]: Hygiene *)
+  Judgment(EnvHole(new_mvar("g")), ctx, CHole(new_mvar("t")));;
 
 
 (* Printing *)
@@ -55,7 +41,7 @@ let rec show_environment (env: environment): string =
 let show_judgment (j: judgment): string =
   match j with
   | Judgment(env, e, t) ->
-     Printf.sprintf "judgment %s |- %s : %s"
+     Printf.sprintf "%s |- %s : %s"
                     (show_environment env)
                     (show_context e)
                     (show_context t);;
@@ -71,8 +57,13 @@ let show_inference_rule (r: inference_rule): string =
   | InferenceRule([], conclusion) ->
      Printf.sprintf "rule %s" (show_judgment conclusion)
   | InferenceRule(premises, conclusion) ->
-     Printf.sprintf "rule %s => %s" (show_premises premises) (show_judgment conclusion);;
+     Printf.sprintf "rule %s  =>  %s" (show_premises premises) (show_judgment conclusion);;
 
+let rec show_inference_rules (rs: inference_rule list): string =
+  match rs with
+  | [] -> ""
+  | (r :: rs) -> Printf.sprintf "  %s\n%s" (show_inference_rule r) (show_inference_rules rs);;
+  
 let show_derivation (d: derivation): string =
   let indent (indentation: int): string =
     String.make (4 * indentation) ' '

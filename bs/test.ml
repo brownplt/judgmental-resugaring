@@ -7,6 +7,7 @@ open Desugar;;
 open Parse;;
 open Judgment;;
 open Infer;;
+open Fresh;;
 
 let gram =
   parse_grammar_s "example_grammar"
@@ -54,17 +55,22 @@ let judge_let =
      rule g |- f : (TFun s t)
           g |- e : s
        => g |- (Apply f e) : t";;
-
+  
 let test_infer (ds: rule) (rs: inference_rule list): bool =
   match ds with
   | Rule(lhs, rhs) ->
-     (* [TODO]: hygiene *)
-     let j = Judgment(EnvHole(new_mvar("g")), rhs, CHole(new_mvar("t"))) in
-     let j = freshen_judgment(j) in
+     let j = freshen_judgment (generic_judgment rhs) in
      let deriv = infer rs j in
-     Printf.printf "\nInferred:\n%s\n\n" (show_derivation deriv);
+     Printf.printf "\nInferred:\n%s\n" (show_derivation deriv);
      true;;
 
+let test_resugar (ds: rule list) (rs: inference_rule list): bool =
+  let derivs = resugar rs ds in
+  Printf.printf "\nResugared:\n";
+  List.iter (fun d -> Printf.printf "%s\n" (show_derivation d)) derivs;
+  true;;
+  
+  
 let test_desugar (t: string) (exp: string): bool =
   let t = parse_term_s "<test>" t in
   let exp = parse_term_s "<test>" exp in
@@ -113,6 +119,8 @@ let tests =
        TestGroup(
            "Inference",
            [Test("Let",
+                 fun() -> test_resugar ds_let judge_let);
+            Test("Let",
                  fun() -> test_infer (List.hd ds_let) judge_let)])]);;
   
 run_tests tests;;

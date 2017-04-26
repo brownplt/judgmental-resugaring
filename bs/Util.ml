@@ -1,3 +1,7 @@
+let debug_on = false;;
+
+let () = Printexc.record_backtrace true;;
+
 type ('a, 'b) result =
   | Ok of 'a
   | Err of 'b;;
@@ -48,6 +52,9 @@ let and_result2 (f: 'c -> 'd -> ('a, 'b) result) (xs: 'c list) (ys: 'd list)
     | (_, _) -> raise(Invalid_argument "and_result2 received lists of different lengths") in
   recur xs ys [];;
 
+let debug (s: string): unit =
+  if debug_on then print_endline s;;
+  
 let error (s: string): 'a =
   failwith (Printf.sprintf "Error: %s" s);;
 

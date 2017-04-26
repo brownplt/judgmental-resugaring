@@ -1,4 +1,5 @@
 COMPILE=./node_modules/bs-platform/bin/bsc.exe
+COMPILE_OCAML=ocamlc
 
 all:
 	$(COMPILE) Util.ml
@@ -14,7 +15,17 @@ all:
 	$(COMPILE) Parser.ml
 	$(COMPILE) Lexer.ml
 	$(COMPILE) Parse.ml
-	$(COMPILE) -bs-main test.ml
+	$(COMPILE) Fresh.mli
+	$(COMPILE) Fresh.ml
+	$(COMPILE) Infer.mli
+	$(COMPILE) Infer.ml
+	$(COMPILE) TestRunner.mli
+	$(COMPILE) TestRunner.ml
+	$(COMPILE) test.ml
+	node test.js
+
+ocaml:
+	$(COMPILE_OCAML) -g -o test Util.ml Term.ml Grammar.ml Desugar.ml Judgment.ml Parser.mli Parser.ml Lexer.ml Parse.ml Fresh.mli Fresh.ml Infer.mli Infer.ml TestRunner.mli TestRunner.ml test.ml
 
 clean:
 	rm *.js
