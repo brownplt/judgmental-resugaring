@@ -1,0 +1,11 @@
+[package]
+name = "judgmental-resugaring"
+version = "0.1.0"
+authors = ["Justin <justinpombrio@cs.brown.edu>"]
+
+[dependencies]
+combine = "*"
+
+[dependencies.nom]
+version = "^2.2"
+features = ["regexp"]
