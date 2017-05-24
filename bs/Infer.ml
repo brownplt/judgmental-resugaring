@@ -97,69 +97,43 @@ let rec expand_derivation (m: mapping) (d: derivation): derivation =
 
 (* [TODO] Assumption that variables in inference rules are distinct. *)
 
-let rec matches_context (m: mapping) (c1: context) (c2: context): bool =
-  match (c1, c2) with
-  | (c1, CHole(v)) ->
-     (match lookup_context m v with
-      | None -> true
-      | Some(c2) -> matches_context m c1 c2)
-  | (CHole(_), _) -> false
-  | (CVal(a), CVal(b)) -> a = b
-  | (CStx(a, ca), CStx(b, cb)) ->
-     (a = b) && List.for_all2 (matches_context m) ca cb
-  | (_, _) -> false;;
-
-let rec matches_environment (m: mapping) (env1: environment) (env2: environment): bool =
-  match (env1, env2) with
-  | (env1, EnvHole(v)) ->
-     (match lookup_environment m v with
-      | None -> true
-      | Some(env2) -> matches_environment m env1 env2)
-  | (EnvHole(_), _) -> false
-  | (EnvEmpty(), EnvEmpty()) -> true
-  | (EnvCons(_, t1, env1), EnvCons(_, t2, env2)) ->
-     matches_context m t1 t2 && matches_environment m env1 env2
-  | (_, _) -> false;;
-
-let matches_judgment (m: mapping) (j1: judgment) (j2: judgment): bool =
-  match (j1, j2) with
-  | (Judgment(env1, e1, t1), Judgment(env2, e2, t2)) ->
-     matches_environment m env1 env2
-     && matches_context m e1 e2
-     && matches_context m t1 t2;;
-
-
 (* Binding *)
 
-let rec bind_context (m: mapping) (c1: context) (c2: context) =
-  match (c1, c2) with
+let rec bind_context (m: mapping) (c1: context) (c2: context): bool =
+  let ans = match (c1, c2) with
   | (c1, CHole(v)) ->
      (match lookup_context m v with
-      | None -> insert_context m v c1
+      | None -> insert_context m v c1; true
       | Some(c2) -> bind_context m c1 c2)
-  | (CVal(_), CVal(_)) -> ()
-  | (CStx(_, ca), CStx(_, cb)) -> List.iter2 (bind_context m) ca cb
-  | (_, _) -> internal_error "bind_context - contexts do not match";;
+(*      | Some(c2) -> c1 = c2) (* TODO: equality constraints *) *)
+  | (CVal(a), CVal(b)) -> a = b
+  | (CStx(a, ca), CStx(b, cb)) ->
+     a = b && List.for_all2 (bind_context m) ca cb
+  | (_, _) ->
+     internal_error "bind_context - contexts do not match" in
+(*  Printf.printf "bind %s %s %s\n" (show_context c1) (show_context c2) (string_of_bool ans); *)
+  ans;;
 
-let rec bind_environment (m: mapping) (env1: environment) (env2: environment) =
+let rec bind_environment (m: mapping) (env1: environment) (env2: environment): bool =
   match (env1, env2) with
   | (env1, EnvHole(v)) ->
      (match lookup_environment m v with
-      | None -> insert_environment m v env1
-      | Some(env2) -> bind_environment m env1 env2)
-  | (EnvEmpty(), EnvEmpty()) -> ()
+      | None -> insert_environment m v env1; true
+      | Some(env2) -> env1 = env2) (* TODO: equality constraints *)
+  | (EnvEmpty(), EnvEmpty()) -> true
   | (EnvCons(x1, t1, env1), EnvCons(x2, t2, env2)) ->
      insert_var m x2 x1;
-     bind_context m t1 t2;
-     bind_environment m env1 env2
+     (bind_context m t1 t2) && (bind_environment m env1 env2)
   | (_, _) -> internal_error "bind_environment - environments do not match";;
 
-let bind_judgment (m: mapping) (j1: judgment) (j2: judgment) =
-  match (j1, j2) with
+let bind_judgment (m: mapping) (j1: judgment) (j2: judgment): bool =
+  let ans = match (j1, j2) with
   | (Judgment(env1, e1, t1), Judgment(env2, e2, t2)) ->
-     bind_environment m env1 env2;
-     bind_context m e1 e2;
-     bind_context m t1 t2;;
+     (bind_environment m env1 env2)
+     && (bind_context m e1 e2)
+     && (bind_context m t1 t2) in
+(*  Printf.printf "bind %s %s %s\n" (show_judgment j1) (show_judgment j2) (string_of_bool ans); *)
+  ans;;
 
 
 (* Expansion Inference Rules *)
@@ -178,36 +152,34 @@ let rec add_expansion_rules
 (* Inference *)
 
 (* Assumes that r has been freshened. *)
-let derive_premises (m: mapping) (j: judgment) (r: inference_rule): judgment list option =
+let derive_premises (j: judgment) (r: inference_rule): judgment list option =
   match r with
-  | InferenceRule(presmises, conclusion) ->
-     if matches_judgment m j conclusion
-     then (bind_judgment m j conclusion;
-           Some(presmises))
+  | InferenceRule(premises, conclusion) ->
+     let m = new_mapping() in
+     if bind_judgment m j conclusion
+     then Some(List.map (expand_judgment m) premises)
      else None;;
 
-let rec derive_tree (rules: inference_rule list) (m: mapping) (j: judgment): derivation =
+let rec derive_tree (rules: inference_rule list) (j: judgment): derivation =
   let rec recur (rs: inference_rule list): derivation =
     match rs with
     | [] ->
        error (Printf.sprintf "No derivation found for %s\n" (show_judgment j))
     | (r :: rs) ->
-       match derive_premises m j r with
+       match derive_premises j r with
        | None -> recur rs
        | Some(premises) ->
-          debug (Printf.sprintf "applying rule %s" (show_inference_rule r));
-          Derivation(List.map (derive_tree rules m) premises, j)
+          debug (Printf.sprintf "Applying %s" (show_inference_rule r));
+          debug (Printf.sprintf "  to get %s" (show_judgments premises));
+          Derivation(List.map (derive_tree rules) premises, j)
   in
   if atomic_judgment j
   then Derivation([], j)
-            else recur (List.map freshen_inference_rule rules);;
+  else recur (List.map freshen_inference_rule rules);;
 
 let infer (rules: inference_rule list) (j: judgment): derivation =
   debug (Printf.sprintf "infer: %s\n" (show_judgment j));
-  let m = new_mapping() in
-  let d = derive_tree rules m j in
-  let ans = expand_derivation m d in
-  ans;;
+  derive_tree rules j;;
 
 let resugar (inf_rules: inference_rule list) (ds_rules: Desugar.rule list): derivation list =
   debug "resugar:";
@@ -216,7 +188,7 @@ let resugar (inf_rules: inference_rule list) (ds_rules: Desugar.rule list): deri
   let resugar_rule rule =
     match rule with
     | Desugar.Rule(lhs, _) -> 
-       infer inf_rules (freshen_judgment (generic_judgment lhs))
+       infer inf_rules (generic_judgment lhs)
   in
   let ans = List.map resugar_rule ds_rules in
   ans;;

@@ -24,11 +24,6 @@ let atomic_judgment (j: judgment): bool =
   let Judgment(_, e, _) = j in
   atomic_context e;;
 
-let generic_judgment (ctx: context): judgment =
-  (* [TODO]: Hygiene *)
-  Judgment(EnvHole(new_mvar("g")), ctx, CHole(new_mvar("t")));;
-
-
 (* Printing *)
 
 let rec show_environment (env: environment): string =
@@ -46,18 +41,18 @@ let show_judgment (j: judgment): string =
                     (show_context e)
                     (show_context t);;
 
-let show_inference_rule (r: inference_rule): string =
-  let rec show_premises (js: judgment list): string =
-    match js with
-    | []        -> ""
-    | [j]       -> show_judgment j
-    | (j :: js) -> Printf.sprintf "%s %s" (show_judgment j) (show_premises js) in
+let rec show_judgments (js: judgment list): string =
+  match js with
+  | []        -> ""
+  | [j]       -> show_judgment j
+  | (j :: js) -> Printf.sprintf "%s %s" (show_judgment j) (show_judgments js);;
 
+let show_inference_rule (r: inference_rule): string =
   match r with
   | InferenceRule([], conclusion) ->
      Printf.sprintf "rule %s" (show_judgment conclusion)
   | InferenceRule(premises, conclusion) ->
-     Printf.sprintf "rule %s  =>  %s" (show_premises premises) (show_judgment conclusion);;
+     Printf.sprintf "rule %s  =>  %s" (show_judgments premises) (show_judgment conclusion);;
 
 let rec show_inference_rules (rs: inference_rule list): string =
   match rs with
@@ -75,9 +70,9 @@ let show_derivation (d: derivation): string =
                       (indent indentation)
                       (show_judgment conclusion)
     | Derivation(premises, conclusion) ->
-       Printf.sprintf "%s%s=> %s\n"
+       Printf.sprintf "%s%s => %s"
                       (show_forest premises (indentation + 1))
-                      (indent (indentation + 2))
+                      (indent (indentation))
                       (show_judgment conclusion)
   and show_forest (ds: derivation list) (indentation: int): string =
     match ds with
@@ -86,4 +81,4 @@ let show_derivation (d: derivation): string =
                                   (show_tree d indentation)
                                   (show_forest ds indentation)
   in
-  show_tree d 0
+  Printf.sprintf "%s\n" (show_tree d 0)

@@ -1,4 +1,5 @@
 let debug_on = false;;
+let debug_var_on = false;;
 
 let () = Printexc.record_backtrace true;;
 

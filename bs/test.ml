@@ -9,6 +9,10 @@ open Judgment;;
 open Infer;;
 open Fresh;;
 
+(* TODO:
+   - Before resugaring, validate desugaring rules against the grammar.
+ *)
+
 let gram =
   parse_grammar_s "example_grammar"
     "Lit = VALUE;
@@ -35,31 +39,40 @@ let gram_let =
      Expr = VARIABLE
           | (Num Lit)
           | (Let Decl Type Expr Expr)
+          | (Or Expr Expr)
+          | (If Expr Expr Expr)
           | (Lambda Decl Type Expr)
           | (Apply Expr Expr);
      Judge = (Judge Ctx Expr Type);
      Ctx = (CtxEmpty)
          | (CtxCons Decl Type Ctx);
      Type = (TNum)
+          | (TBool)
           | (TFun Type Type);";;
 
 let ds_let =
   parse_ds_rules_s "let_desugaring"
     "rule (Let x t a b)
-       => (Apply (Lambda x t b) a)";;
+       => (Apply (Lambda x t b) a)
+     rule (Or a b)
+       => (Let x (TBool) a (If x x b))";;
 
 let judge_let =
   parse_inference_rules_s "let_inference_rules"
     "rule x: s, g |- e : t
-       => g |- (Lambda x s e) : t
+       => g |- (Lambda x s e) : (TFun s t)
      rule g |- f : (TFun s t)
           g |- e : s
-       => g |- (Apply f e) : t";;
+       => g |- (Apply f e) : t
+     rule g |- a : (TBool)
+          g |- b : t
+          g |- c : t
+       => g |- (If a b c) : t";;
   
 let test_infer (ds: rule) (rs: inference_rule list): bool =
   match ds with
   | Rule(lhs, rhs) ->
-     let j = freshen_judgment (generic_judgment rhs) in
+     let j = generic_judgment rhs in
      let deriv = infer rs j in
      Printf.printf "\nInferred:\n%s\n" (show_derivation deriv);
      true;;

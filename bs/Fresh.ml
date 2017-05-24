@@ -1,7 +1,7 @@
 open Term;;
 open Judgment;;
 
-type fresh = (string, int) Hashtbl.t;;
+type fresh = ((string * int), int) Hashtbl.t;;
 
   
 let next_fresh_id = ref 0;;
@@ -13,13 +13,13 @@ let fresh_id(): int =
 let f_mvar (f: fresh) (v: mvar): mvar =
   match v with
   | MVar(name, id) ->
-     if Hashtbl.mem f name
+     if Hashtbl.mem f (name, id)
      then
-       let new_id = Hashtbl.find f name in
+       let new_id = Hashtbl.find f (name, id) in
        MVar(name, new_id)
      else 
        let new_id = fresh_id() in
-       Hashtbl.add f name new_id;
+       Hashtbl.add f (name, id) new_id;
        MVar(name, new_id);;
 
 let rec f_context (f: fresh) (c: context): context =
@@ -47,8 +47,14 @@ let f_inference_rule (f: fresh) (r: inference_rule): inference_rule =
 
 (* Public *)
 
+let freshen_context (c: context): context =
+  f_context (Hashtbl.create 0) c;;
+
 let freshen_judgment (j: judgment): judgment =
   f_judgment (Hashtbl.create 0) j;;
 
 let freshen_inference_rule (r: inference_rule): inference_rule =
   f_inference_rule (Hashtbl.create 0) r;;
+
+let generic_judgment (ctx: context): judgment =
+  Judgment(EnvHole(new_mvar("g")), freshen_context ctx, CHole(new_mvar("r")));;

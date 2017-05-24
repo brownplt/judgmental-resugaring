@@ -35,7 +35,7 @@ let atomic_context (c: context): bool =
 let show_mvar (var: mvar): string =
   match var with
   | MVar(name, id) ->
-     if debug_on
+     if debug_var_on
      then Printf.sprintf "%s_%s" name (string_of_int id)
      else name;;
 
