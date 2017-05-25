@@ -5,7 +5,7 @@ open Term;;
 type environment =
   | EnvEmpty of unit
   | EnvHole of mvar
-  | EnvCons of mvar * context * environment;;
+  | EnvCons of context * context * environment;;
 
 type judgment =
   | Judgment of environment * context * context;;
@@ -17,7 +17,7 @@ type derivation =
   | Derivation of derivation list * judgment;;
 
 
-
+  
 (* Checking if Atomic *)
 
 let atomic_judgment (j: judgment): bool =
@@ -31,7 +31,7 @@ let rec show_environment (env: environment): string =
   | EnvEmpty()         -> "empty"
   | EnvHole(v)         -> show_mvar v
   | EnvCons(v, t, env) -> Printf.sprintf "%s: %s, %s"
-                          (show_mvar v) (show_context t) (show_environment env);;
+                          (show_context v) (show_context t) (show_environment env);;
 
 let show_judgment (j: judgment): string =
   match j with

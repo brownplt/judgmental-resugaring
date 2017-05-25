@@ -26,6 +26,7 @@ let rec f_context (f: fresh) (c: context): context =
   match c with
   | CVal(_)        -> c
   | CVar(_)        -> c
+  | CAtom(_)       -> c
   | CHole(v)       -> CHole(f_mvar f v)
   | CStx(head, cs) -> CStx(head, List.map (f_context f) cs);;
 
@@ -33,7 +34,7 @@ let rec f_env (f: fresh) (env: environment): environment =
   match env with
   | EnvEmpty()         -> EnvEmpty()
   | EnvHole(v)         -> EnvHole(f_mvar f v)
-  | EnvCons(v, t, env) -> EnvCons(f_mvar f v, f_context f t, f_env f env);;
+  | EnvCons(v, t, env) -> EnvCons(f_context f v, f_context f t, f_env f env);;
 
 let f_judgment (f: fresh) (j: judgment): judgment =
   match j with
@@ -57,4 +58,4 @@ let freshen_inference_rule (r: inference_rule): inference_rule =
   f_inference_rule (Hashtbl.create 0) r;;
 
 let generic_judgment (ctx: context): judgment =
-  Judgment(EnvHole(new_mvar("g")), freshen_context ctx, CHole(new_mvar("r")));;
+  Judgment(EnvHole(new_mvar("g")), ctx, CHole(new_mvar("r")));;

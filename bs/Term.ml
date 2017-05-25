@@ -14,6 +14,7 @@ type term =
 type context =
   | CVal of string
   | CHole of mvar
+  | CAtom of var
   | CVar of var
   | CStx of string * context list;;
 
@@ -26,8 +27,14 @@ let new_mvar (name: string): mvar =
 
 let atomic_context (c: context): bool =
   match c with
-  | CHole(_) -> true
+  | CAtom(_) -> true
   | _ -> false;;
+
+let rec opacify_context (c: context): context =
+  match c with
+  | CStx(a, ca) -> CStx(a, List.map opacify_context ca)
+  | CHole(MVar(x, _)) -> CAtom(x)
+  | _ -> c;;
 
 
 (* Printing *)
@@ -62,6 +69,7 @@ let rec show_context (t: context): string =
   | CVal(v)        -> Printf.sprintf "\"%s\"" v (* TODO: string escapes *)
   | CVar(var)      -> var
   | CHole(var)     -> show_mvar var
+  | CAtom(var)     -> Printf.sprintf "$%s" var (* TODO: make parsing and printing inverses *)
   | CStx(head, []) -> Printf.sprintf "(%s)" head
   | CStx(head, ts) -> Printf.sprintf "(%s %s)" head (show_contexts ts)
 and show_contexts (ts: context list): string =

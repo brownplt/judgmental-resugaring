@@ -76,10 +76,10 @@ environment:
     Judgment.EnvHole(Term.new_mvar($1))
   }
   | LID COLON context {
-    Judgment.EnvCons(Term.new_mvar($1), $3, Judgment.EnvEmpty())
+    Judgment.EnvCons(Term.CHole(Term.MVar($1, 0)), $3, Judgment.EnvEmpty())
   }
   | LID COLON context COMMA environment {
-    Judgment.EnvCons(Term.new_mvar($1), $3, $5)
+    Judgment.EnvCons(Term.CHole(Term.MVar($1, 0)), $3, $5)
   }
 ;
 

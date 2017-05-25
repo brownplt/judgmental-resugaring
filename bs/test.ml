@@ -52,10 +52,10 @@ let gram_let =
 
 let ds_let =
   parse_ds_rules_s "let_desugaring"
-    "rule (Let x t a b)
-       => (Apply (Lambda x t b) a)
+    "rule (Let y t a b)
+       => (Apply (Lambda y t b) a)
      rule (Or a b)
-       => (Let x (TBool) a (If x x b))";;
+       => (Let X (TBool) a (If X X b))";;
 
 let judge_let =
   parse_inference_rules_s "let_inference_rules"
@@ -67,12 +67,15 @@ let judge_let =
      rule g |- a : (TBool)
           g |- b : t
           g |- c : t
-       => g |- (If a b c) : t";;
+       => g |- (If a b c) : t
+     rule
+       => x: t, g |- x : t
+     ";;
   
 let test_infer (ds: rule) (rs: inference_rule list): bool =
   match ds with
   | Rule(lhs, rhs) ->
-     let j = generic_judgment rhs in
+     let j = generic_judgment (opacify_context rhs) in
      let deriv = infer rs j in
      Printf.printf "\nInferred:\n%s\n" (show_derivation deriv);
      true;;
