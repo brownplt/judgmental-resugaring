@@ -8,6 +8,10 @@ Cargo.lock
 target
 Cargo.lock
 
+*~
+/node_modules
+/redex/compiled
+
 # OCaml & BS
 *.cmi
 *.cmo
@@ -18,6 +22,7 @@ Cargo.lock
 /bs/node_modules/
 /bs/test
 /bs/_build
+/bs/bsconfig.json
 Parser.ml
 Parser.mli
 Lexer.ml
