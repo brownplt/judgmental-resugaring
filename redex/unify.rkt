@@ -33,6 +33,9 @@
     (set! the-char (+ the-char 1))
     ch))
 
+(define (reset-char!)
+  (set! the-char (char->integer #\A)))
+
 (define (fresh-type-var)
   (string->symbol (make-string 1 (next-char))))
 
@@ -190,23 +193,15 @@
 ;; ------------------------------------------------------------
 ;; Resugaring
 
-(define (render-atoms t)
-  (cond
-    [(literal? t) t]
-    [(variable? t) t]
-    [(and (list? t) (not (empty? t)) (equal? 'atom (first t)))
-     (second t)]
-    [(list? t) (map render-atoms t)]
-    [else (raise "render-atoms - fell off cond")]))
-
 (define (make-sugar-rule name unif conclusion)
-  (derivation (render-atoms (substitute unif conclusion))
+  (derivation (substitute unif conclusion)
               name
               (map (lambda (eq) (derivation eq "assume" (list)))
                    (unification-judgement-list unif))))
 
 (define-syntax-rule (resugar rule ty literals)
   (parameterize ([fresh-vars (ds-rule-fresh rule)])
+    (reset-char!)
     (let [[derivations (build-derivations (ty [] ,(ds-rule-rhs rule) _))]]
       (when (not (eq? 1 (length derivations)))
         (error 'derive "Expected exactly one derivation, but found ~a derivations" (length derivations)))
@@ -312,7 +307,6 @@
   (check-equal? (substitute unif2 (list (list 'X))) (list (list 'Y)))
 
   (define unif3 (equate 'B 'C (equate 'A (list 'B 'C) (new-unification))))
-  (display-unification unif3)
   (check-equal? (substitute unif3 'B) 'C)
   (check-equal? (substitute unif3 'A) (list 'C 'C)))
 

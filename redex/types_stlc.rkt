@@ -50,11 +50,6 @@
   [(extend [(x_s : t_s) ...] x t)
    [(x_s : t_s) ... (x : t)]])
 
-(define-metafunction stlc-syntax
-  fresh-type : -> x
-  [(fresh-type)
-   ,(fresh-type-var)])
-
 
 ;(define-extended-judgment-form stlc-syntax =>base
 (define-judgment-form stlc-syntax
@@ -93,7 +88,8 @@
    (⊢ Γ (iszero e) Bool)]
 
   ; stlc
-  [(where t (lookup x Γ))
+  [(side-condition ,(not (string-prefix? (symbol->string (term x)) "~"))) ; exclude atoms
+   (where t (lookup x Γ))
    ------ t-id
    (⊢ Γ x t)]
   
@@ -103,7 +99,7 @@
 
   [(⊢ Γ e_fun t_fun)
    (⊢ Γ e_arg t_arg)
-   (where x_t (fresh-type))
+   (where x_t ,(fresh-type-var))
    (con (t_fun = (t_arg -> x_t)))
    ------ t-apply
    (⊢ Γ (e_fun e_arg) x_t)]
@@ -119,10 +115,10 @@
    (⊢ Γ (e as t_1) t_1)]
 
   ; fixed
-  [(where x_t ,(atom-type-var (term x))) ; TODO: safety checks!
-   (con (,(unfreshen (term Γ)) ⊢ x : x_t))
+  [(where x_t ,(atom-type-var (term a))) ; TODO: safety checks!
+   (con (,(unfreshen (term Γ)) ⊢ a : x_t))
    ------ t-atom
-   (⊢ Γ (atom x) x_t)]
+   (⊢ Γ a x_t)]
 
   ; fixed
   [(⊢ Γ e_1 t_3)
@@ -145,43 +141,43 @@
 
 (define rule_not
   (rule "not" #:fresh()
-        (not (atom a))
-        (if (atom a) false true)))
+        (not ~a)
+        (if ~a false true)))
 
 (define rule_unless
   (rule "unless" #:fresh()
-        (unless (atom a) (atom b) (atom c))
-        (if (atom a) (atom c) (atom b))))
+        (unless ~a ~b ~c)
+        (if ~a ~c ~b)))
 
 (define rule_ifzero
   (rule "ifzero" #:fresh()
-        (ifzero (atom a) (atom b) (atom c))
-        (if (iszero (atom a)) (atom b) (atom c))))
+        (ifzero ~a ~b ~c)
+        (if (iszero ~a) ~b ~c)))
 
 (define rule_thunk
   (rule "thunk" #:fresh(x)
-        (thunk (atom a))
-        (λ (x : Nat) (atom a))))
+        (thunk ~a)
+        (λ (x : Nat) ~a)))
 
 (define rule_let
   (rule "let" #:fresh()
-        (let x = (atom a) in (atom b))
-        (typeof (atom a) = x_t in ((λ (x : x_t) (atom b)) (atom a)))))
+        (let x = ~a in ~b)
+        (typeof ~a = t in ((λ (x : t) ~b) ~a))))
 
 (define rule_or
   (rule "or" #:fresh(x)
-        (or (atom a) (atom b))
-        ((λ (x : Bool) (if x x (atom b))) (atom a))))
+        (or ~a ~b)
+        ((λ (x : Bool) (if x x ~b)) ~a)))
 
 (define rule_seq
   (rule "seq" #:fresh(x)
-        (seq (atom a) (atom b))
-        ((λ (x : Unit) (atom b)) (atom a))))
+        (seq ~a ~b)
+        ((λ (x : Unit) ~b) ~a)))
 
 (define rule_sametype
   (rule "sametype" #:fresh()
-        (sametype (atom a) (atom b))
-        (typeof (atom b) = x_t in ((atom a) as x_t))))
+        (sametype ~a ~b)
+        (typeof ~b = x_t in (~a as x_t))))
 
 (define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Num 'Bool 'true 'false 'Unit 'as)) ; todo
 

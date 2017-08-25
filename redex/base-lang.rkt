@@ -19,14 +19,17 @@
 
 (define-language base-syntax
   (e ::=
-     (atom x)
+     a
      x)
-  (x ::= variable-not-otherwise-mentioned)
   (t ::= x)
   (Γ ::= [(x : t) ...])
+  (a ::= (variable-prefix ~))
+  (x ::= variable-not-otherwise-mentioned)
   (c ::=
      j
      q
      (assumption any))
   (j ::=  (Γ ⊢ x : t))
   (q ::= (t = t)))
+
+(caching-enabled? #f)
