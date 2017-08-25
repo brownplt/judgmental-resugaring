@@ -5,32 +5,39 @@
 (require "base-lang.rkt")
 
 
-;; ---------------------------------------------------------------------------------------------------
-;; booleans (TAPL pg.93)
-;; numbers  (TAPL pg.93)
-;; stlc     (TAPL pg.103)
+;; --------------------------------------------------------------------------------------------------- 
+;; This file tests type resugaring for a language consisting of:
+;;   booleans   (TAPL pg.93)
+;;   numbers    (TAPL pg.93)
+;;   stlc       (TAPL pg.103)
+;;   unit       (TAPL pg.119)
+;;   ascription (TAPL pg.122)
 
 (define-extended-language stlc-syntax base-syntax
   (e ::= ....
+     v
      (if e e e)
      (succ e)
      (pred e)
      (iszero e)
      (typeof e = t in e)
      (e e)
-     (λ (x : t) e))
+     (λ (x : t) e)
+     (e as t))
   (x ::= variable-not-otherwise-mentioned)
-  (v ::= ....
+  (v ::=
      true
      false
-     nat)
+     n
+     unit)
   (n ::=
      0
      (succ n))
   (t ::= ....
      Bool
      Nat
-     (t -> t)))
+     (t -> t)
+     Unit))
 
 (define-metafunction stlc-syntax
   lookup : x Γ -> t
@@ -43,84 +50,86 @@
   [(extend [(x_s : t_s) ...] x t)
    [(x_s : t_s) ... (x : t)]])
 
+(define-metafunction stlc-syntax
+  fresh-type : -> x
+  [(fresh-type)
+   ,(fresh-type-var)])
+
+
 ;(define-extended-judgment-form stlc-syntax =>base
 (define-judgment-form stlc-syntax
-  #:contract (=> Γ e t)
-  #:mode (=> I I O)
+  #:contract (⊢ Γ e t)
+  #:mode (⊢ I I O)
 
   ; booleans
-  [(<= Γ e_1 Bool)
-   (=> Γ e_2 t)
-   (<= Γ e_3 t)
+  [(⊢ Γ e_1 t_1)
+   (⊢ Γ e_2 t_2)
+   (⊢ Γ e_3 t_3)
+   (con (t_1 = Bool))
+   (con (t_2 = t_3))
    ------ t-if
-   (=> Γ (if e_1 e_2 e_3) t)]
+   (⊢ Γ (if e_1 e_2 e_3) t_3)]
 
   [------ t-true
-   (=> Γ true Bool)]
+   (⊢ Γ true Bool)]
 
   [------ t-false
-   (=> Γ false Bool)]
+   (⊢ Γ false Bool)]
 
   ; nats
-  [(<= Γ e Nat)
+  [(⊢ Γ e t)
+   (con (t = Nat))
    ------ t-succ
-   (=> Γ (succ e) Nat)]
+   (⊢ Γ (succ e) Nat)]
 
-  [(<= Γ e Nat)
+  [(⊢ Γ e t)
+   (con (t = Nat))
    ------ t-pred
-   (=> Γ (pred e) Nat)]
+   (⊢ Γ (pred e) Nat)]
 
-  [(<= Γ e Nat)
+  [(⊢ Γ e t)
+   (con (t = Nat))
    ------ t-iszero
-   (=> Γ (iszero e) Bool)]
+   (⊢ Γ (iszero e) Bool)]
 
   ; stlc
-  [(=> (extend Γ x t_1) e t_2)
+  [(where t (lookup x Γ))
+   ------ t-id
+   (⊢ Γ x t)]
+  
+  [(⊢ (extend Γ x t_1) e t_2)
    ------ t-lambda
-   (=> Γ (λ (x : t_1) e) t_2)]
+   (⊢ Γ (λ (x : t_1) e) (t_1 -> t_2))]
 
-  [(where T1 (fresh-type))
-   (where T2 (fresh-type))
-   (<= Γ e_fun (T1 -> T2))
-   (<= Γ e_arg T1)
+  [(⊢ Γ e_fun t_fun)
+   (⊢ Γ e_arg t_arg)
+   (where x_t (fresh-type))
+   (con (t_fun = (t_arg -> x_t)))
    ------ t-apply
-   (=> Γ (e_fun e_arg) T2)]
+   (⊢ Γ (e_fun e_arg) x_t)]
+
+  ; unit
+  [------ t-unit
+   (⊢ Γ unit Unit)]
+
+  ; ascription
+  [(⊢ Γ e t_2)
+   (con (t_1 = t_2))
+   ------ t-ascribe
+   (⊢ Γ (e as t_1) t_1)]
 
   ; fixed
   [(where x_t ,(atom-type-var (term x))) ; TODO: safety checks!
    (con (,(unfreshen (term Γ)) ⊢ x : x_t))
    ------ t-atom
-   (=> Γ (atom x) x_t)]
+   (⊢ Γ (atom x) x_t)]
 
   ; fixed
-  [(=> Γ e_1 t_3)
+  [(⊢ Γ e_1 t_3)
    (con (t_1 = t_3))
-   (=> Γ e_2 t_2)
+   (⊢ Γ e_2 t_2)
    ------ t-typeof
-   (=> Γ (typeof e_1 = t_1 in e_2) t_2)])
-
-(define the-char (char->integer #\A))
-(define (next-char)
-  (let ([ch (integer->char the-char)])
-    (set! the-char (+ the-char 1))
-    ch))
-(define-metafunction stlc-syntax
-  fresh-type : -> x
-  [(fresh-type)
-   ,(string->symbol (make-string 1 (next-char)))])
-
-
-;(define-extended-judgment-form stlc-syntax <=base
-(define-judgment-form stlc-syntax
-  #:contract (<= Γ e t)
-  #:mode (<= I I I)
-
-  ; fixed
-  [(=> Γ e t_1)
-   (con (t_1 = t_2))
-   ------ t-syn
-   (<= Γ e t_2)])
-
+   (⊢ Γ (typeof e_1 = t_1 in e_2) t_2)])
 
 (define-judgment-form stlc-syntax
   #:contract (con c)
@@ -154,41 +163,31 @@
         (thunk (atom a))
         (λ (x : Nat) (atom a))))
 
-(define rule_app
-  (rule "app" #:fresh()
-        (app (atom a) (atom b))
-        ((atom a) (atom b))))
-
-#;(define rule_let
+(define rule_let
   (rule "let" #:fresh()
         (let x = (atom a) in (atom b))
-        (typeof (atom b) = T in ((λ (x : T) (atom c)) (atom b)))))
+        (typeof (atom a) = x_t in ((λ (x : x_t) (atom b)) (atom a)))))
 
-(define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Num 'Bool 'true 'false)) ; todo
-
-(define deriv_not (resugar rule_not => the-literals))
-(define deriv_unless (resugar rule_unless => the-literals))
-(define deriv_ifzero (resugar rule_ifzero => the-literals))
-(define deriv_thunk (resugar rule_thunk => the-literals))
-#;(define deriv_let (resugar rule_let => the-literals))
-
-(show-derivations (list deriv_not deriv_unless deriv_ifzero deriv_thunk))
-
-#|
-(define rule_let
-  (rule "let" #:fresh ()
-        (let x : T = (atom a : A) in (atom b : B))
-        ((λ (x : T) (atom b : B)) (atom a : A))))
-(define rule_thunk
-  (rule "thunk" #:fresh (x)
-        (thunk (atom a : A))
-        (λ (x : Num) (atom a : A))))
 (define rule_or
-  (rule "or" #:fresh (x)
-        (or (atom a : A) (atom b : B))
-        ((λ (x : A) (if x x (atom b : B))) (atom a : A))))
-(define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Num 'Bool))
-(define deriv_let (resugar rule_let => the-literals))
-(define deriv_or (resugar rule_or => the-literals))
-(show-derivations (list deriv_let deriv_or))
-|#
+  (rule "or" #:fresh(x)
+        (or (atom a) (atom b))
+        ((λ (x : Bool) (if x x (atom b))) (atom a))))
+
+(define rule_seq
+  (rule "seq" #:fresh(x)
+        (seq (atom a) (atom b))
+        ((λ (x : Unit) (atom b)) (atom a))))
+
+(define rule_sametype
+  (rule "sametype" #:fresh()
+        (sametype (atom a) (atom b))
+        (typeof (atom b) = x_t in ((atom a) as x_t))))
+
+(define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Num 'Bool 'true 'false 'Unit 'as)) ; todo
+
+(define (resugar-rule r)
+  (resugar r ⊢ the-literals))
+
+(show-derivations
+ (map resugar-rule
+      (list rule_sametype rule_seq rule_or rule_let rule_not rule_unless rule_ifzero rule_thunk)))

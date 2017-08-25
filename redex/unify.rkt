@@ -2,12 +2,9 @@
 
 (require redex)
 
-(provide resugar unfreshen atom-type-var (rename-out (make-rule rule)))
+(provide resugar unfreshen atom-type-var fresh-type-var (rename-out (make-rule rule)))
 
 ;; assumption: Redex model does not contain #f
-
-(define (atom-type-var atom)
-  (string->symbol (string-upcase (symbol->string atom))))
 
 ;; ------------------------------------------------------------
 ;; Desugaring Rules
@@ -25,11 +22,28 @@
 (define-syntax-rule (make-rule name #:fresh (fresh-name ...) lhs rhs)
   (ds-rule name (list 'fresh-name ...) (term lhs) (term rhs)))
 
+;; ------------------------------------------------------------
+;; Fresh Types
+
+; TODO: no-one will ever need more than 26 type variables, right?
+(define the-char (char->integer #\A))
+
+(define (next-char)
+  (let ([ch (integer->char the-char)])
+    (set! the-char (+ the-char 1))
+    ch))
+
+(define (fresh-type-var)
+  (string->symbol (make-string 1 (next-char))))
+
+(define (atom-type-var atom)
+  (fresh-type-var))
+
 
 ;; ------------------------------------------------------------
 ;; Language Literals
 
-(define language-literals (make-parameter #f))
+(define language-literals (make-parameter (set)))
 
 (define (variable? x)
   (and (symbol? x)
@@ -43,21 +57,15 @@
 ;; ------------------------------------------------------------
 ;; Judgements and Equations
 
-(define (print-judgement j port mode)
-  (show (format "  ~a ⊢ ~a : ~a\n" (judgement-env j) (judgement-id j) (judgement-type j))
-        port mode))
+(define (display-judgement j)
+  (display (format "  ~a ⊢ ~a : ~a\n" (judgement-env j) (judgement-id j) (judgement-type j))))
 
-(define (print-equation eq port mode)
-  (show (format "  ~a = ~a\n" (equation-left eq) (equation-right eq))
-        port mode))
+(define (display-equation eq)
+  (display (format "  ~a = ~a\n" (equation-left eq) (equation-right eq))))
 
-(define-struct judgement (env id type)
-  #:methods gen:custom-write
-  [(define write-proc print-judgement)])
+(define-struct judgement (env id type))
 
-(define-struct equation (left right)
-  #:methods gen:custom-write
-  [(define write-proc print-equation)])
+(define-struct equation (left right))
 
 (define (read-eq eq)
   (match eq
@@ -95,15 +103,13 @@
 ;; ------------------------------------------------------------
 ;; Unifications
 
-(define (print-unification unif port mode)
+(define (display-unification unif)
   (hash-for-each (unification-judgements unif)
-                 (lambda (x j) (show-recur j port mode)))
+                 (lambda (x j) (display-judgement j)))
   (hash-for-each (unification-types unif)
-                 (lambda (x t) (show (format "  ~a = ~a\n" x t) port mode))))
+                 (lambda (x t) (display (format "  ~a = ~a\n" x t)))))
 
-(define-struct unification (judgements types)
-  #:methods gen:custom-write
-  [(define write-proc print-unification)])
+(define-struct unification (judgements types))
 
 (define (new-unification)
   (unification (make-immutable-hash) (make-immutable-hash)))
@@ -142,7 +148,7 @@
                   (map-hash recur (unification-types expr)))]
     [(judgement? expr)
      (judgement (recur (judgement-env expr))
-                (recur (judgement-id expr))
+                (judgement-id expr)
                 (recur (judgement-type expr)))]
     [else (raise "replace - fell off cond")]))
 
@@ -156,6 +162,10 @@
        [t2 t2])]
     [(list? t)
      (map recur t)]
+    [(judgement? t)
+     (judgement (recur (judgement-env t))
+                (judgement-id t)
+                (recur (judgement-type t)))]
     [else (raise "substitute - fell off cond")]))
 
 (define (occurs? x t)
@@ -208,6 +218,7 @@
                  [concl-type (fourth (derivation-term deriv))]
                  [concl-env (second (derivation-term deriv))]
                  [concl (list concl-env '⊢ (term ,(ds-rule-lhs rule)) ': concl-type)]]
+            (display-unification unif) (newline)
             (make-sugar-rule (ds-rule-name rule) unif concl)))))))
 
 
@@ -225,7 +236,7 @@
 (define (add-judgement j1 unif)
   (let [[x (judgement-id j1)]]
     (match (lookup-judgement x unif)
-      [#f (insert-judgement unif x j1)]
+      [#f (insert-judgement unif x (substitute unif j1))]
       [j2 (equate-judgements j1 j2 unif)])))
 
 (define (equate-judgements j1 j2 unif)
@@ -242,11 +253,13 @@
     [[(? variable? x) t]
      ; Maintain the invarient that `subs` is a well-formed substitution:
      ; it does not contain any of its variables in their definitions.
-     (when (and (not (variable? t)) (occurs? x t))
-       (occurs-error x t))
-     (match (lookup-type x unif)
-       [#f (insert-type (replace x t unif) x (substitute unif t))]
-       [t2 (equate t2 t unif)])]
+     (if (occurs? x t)
+         (if (variable? t)
+             unif
+             (occurs-error x t))
+         (match (lookup-type x unif)
+           [#f (insert-type (replace x t unif) x (substitute unif t))]
+           [t2 (equate t2 t unif)]))]
     ; symmetric case
     [[t (? variable? x)]
      (equate x t unif)]
@@ -285,13 +298,36 @@
       (hash-ref hash key)
       #f))
 
-(define (show x port mode)
-  (when mode (write-string x port)))
 
-(define (show-recur x port mode)
-  (case mode
-    [(#t) (write x)]
-    [(#f) (display x)]
-    [else (print x port mode)]))
+;; ------------------------------------------------------------
+;; Tests
+
+(module+ test
+  (require rackunit)
+  
+  (define unif1 (equate 'Y 'Y (new-unification)))
+  (check-equal? (hash-count (unification-types unif1)) 0)
+  
+  (define unif2 (equate 'X 'Y (new-unification)))
+  (check-equal? (substitute unif2 (list (list 'X))) (list (list 'Y)))
+
+  (define unif3 (equate 'B 'C (equate 'A (list 'B 'C) (new-unification))))
+  (display-unification unif3)
+  (check-equal? (substitute unif3 'B) 'C)
+  (check-equal? (substitute unif3 'A) (list 'C 'C)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
