@@ -2,9 +2,12 @@
 
 (require redex)
 
-(provide resugar freshless? unfreshen (rename-out (make-rule rule)))
+(provide resugar unfreshen atom-type-var (rename-out (make-rule rule)))
 
 ;; assumption: Redex model does not contain #f
+
+(define (atom-type-var atom)
+  (string->symbol (string-upcase (symbol->string atom))))
 
 ;; ------------------------------------------------------------
 ;; Desugaring Rules
@@ -16,9 +19,6 @@
 
 (define (unfreshen Γ)
   (filter (λ (b) (not (fresh-binding? b))) Γ))
-
-(define (freshless? Γ)
-  (andmap (λ (b) (not (fresh-binding? b))) Γ))
 
 (define-struct ds-rule (name fresh lhs rhs))
 
@@ -63,7 +63,7 @@
   (match eq
     [(list a '= b)
      (equation a b)]
-    [(list Γ '⊢ (list 'atom x ': y) ': t)
+    [(list Γ '⊢ x ': t)
      (judgement Γ x t)]))
 
 (define (write-eq x eq)
@@ -235,7 +235,7 @@
 
 (define (equate-envs Γ1 Γ2 unif)
   ; TODO: A simplification
-  (equate Γ1 Γ2))
+  (equate Γ1 Γ2 unif))
 
 (define (equate x y unif)
   (match* [x y]
