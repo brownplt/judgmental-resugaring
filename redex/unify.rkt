@@ -2,7 +2,8 @@
 
 (require redex)
 
-(provide resugar unfreshen atom-type-var fresh-type-var (rename-out (make-rule rule)))
+(provide resugar-rule unfreshen atom-type-var fresh-type-var (rename-out (make-rule rule))
+         (struct-out Resugared))
 
 ;; assumption: Redex model does not contain #f
 
@@ -17,10 +18,10 @@
 (define (unfreshen Γ)
   (filter (λ (b) (not (fresh-binding? b))) Γ))
 
-(define-struct ds-rule (name fresh lhs rhs))
+(define-struct DsRule (name fresh lhs rhs))
 
 (define-syntax-rule (make-rule name #:fresh (fresh-name ...) lhs rhs)
-  (ds-rule name (list 'fresh-name ...) (term lhs) (term rhs)))
+  (DsRule name (list 'fresh-name ...) (term lhs) (term rhs)))
 
 ;; ------------------------------------------------------------
 ;; Fresh Types
@@ -193,28 +194,35 @@
 ;; ------------------------------------------------------------
 ;; Resugaring
 
-(define (make-sugar-rule name unif conclusion)
+(define-struct Resugared (derivation rule))
+
+(define (make-sugar-rule name conclusion unif)
   (derivation (substitute unif conclusion)
               name
               (map (lambda (eq) (derivation eq "assume" (list)))
                    (unification-judgement-list unif))))
 
-(define-syntax-rule (resugar rule ty literals)
-  (parameterize ([fresh-vars (ds-rule-fresh rule)])
+(define-syntax-rule (resugar-rule rule ty literals)
+  (parameterize ([fresh-vars (DsRule-fresh rule)])
     (reset-char!)
-    (let [[derivations (build-derivations (ty [] ,(ds-rule-rhs rule) _))]]
+    (let [[derivations (build-derivations (ty [] ,(DsRule-rhs rule) _))]]
       (when (not (eq? 1 (length derivations)))
-        (error 'derive "Expected exactly one derivation, but found ~a derivations" (length derivations)))
+        (display (DsRule-rhs rule)) (newline)
+        (error 'derive "Expected exactly one derivation, but found ~a derivations for ~a"
+               (length derivations)
+               (DsRule-name rule)))
       (let [[deriv (first derivations)]]
         (parameterize [[language-literals literals]]
-          (display (get-constraints deriv)) (newline)
+          (display "Deriv found!") (newline)
+          (display deriv) (newline)
           (let* [[unif (unify (map read-eq (get-constraints deriv))
                               (new-unification))]
                  [concl-type (fourth (derivation-term deriv))]
                  [concl-env (second (derivation-term deriv))]
-                 [concl (list concl-env '⊢ (term ,(ds-rule-lhs rule)) ': concl-type)]]
-            (display-unification unif) (newline)
-            (make-sugar-rule (ds-rule-name rule) unif concl)))))))
+                 [concl (list concl-env '⊢ (term ,(DsRule-lhs rule)) ': concl-type)]]
+            (Resugared
+             deriv
+             (make-sugar-rule (DsRule-name rule) concl unif))))))))
 
 
 ;; ------------------------------------------------------------
@@ -244,17 +252,22 @@
   (equate Γ1 Γ2 unif))
 
 (define (equate x y unif)
+  (display "equate\n")
+  (display x) (newline) (display y) (newline)
+  (display-unification unif) (newline)
   (match* [x y]
     [[(? variable? x) t]
      ; Maintain the invarient that `subs` is a well-formed substitution:
      ; it does not contain any of its variables in their definitions.
-     (if (occurs? x t)
-         (if (variable? t)
-             unif
-             (occurs-error x t))
-         (match (lookup-type x unif)
-           [#f (insert-type (replace x t unif) x (substitute unif t))]
-           [t2 (equate t2 t unif)]))]
+     (let ([t (substitute unif t)])
+       (if (occurs? x t)
+           (begin (display "occurs") (newline)
+                  (if (variable? t)
+                      (begin (display "--var")(newline) unif)
+                      (occurs-error x t)))
+           (match (lookup-type x unif)
+             [#f (insert-type (replace x t unif) x t)]
+             [t2 (equate t2 t unif)])))]
     ; symmetric case
     [[t (? variable? x)]
      (equate x t unif)]
@@ -308,7 +321,10 @@
 
   (define unif3 (equate 'B 'C (equate 'A (list 'B 'C) (new-unification))))
   (check-equal? (substitute unif3 'B) 'C)
-  (check-equal? (substitute unif3 'A) (list 'C 'C)))
+  (check-equal? (substitute unif3 'A) (list 'C 'C))
+
+  (check-equal? (occurs? 'X 'X) true)
+  (check-equal? (occurs? 'X '(List X)) true))
 
 
 
