@@ -43,6 +43,9 @@
      (pair e e)
      (fst e)
      (snd e)
+     ; tuple
+     (tuple e★)
+     (project e n)
      ; record
      #;(record (x e) ...)
      (dot e x)
@@ -61,6 +64,9 @@
      ; builtin
      (calctype e as t in e))
   (x ::= variable-not-otherwise-mentioned)
+  #;(tuple ::=
+     tuple-empty
+     (tuple-cons e tuple))
   (v ::=
      ; booleans
      true
@@ -71,14 +77,17 @@
      unit
      ; pair
      (pair v v)
+     ; tuple
+     (tuple (★ v ...))
+     #;(tuple v ...)
      ; record
      #;(record (x v) ...)
      ; list
      nil
      (cons v v))
   (n ::=
-     0
-     (succ n))
+     number
+     (variable-prefix n$))
   (t ::= ....
      ; booleans
      Bool
@@ -90,12 +99,18 @@
      (t -> t)
      ; pairs
      (Pair t t)
+     ; tuples
+     (Tuple t★)
+     #;Tuple
      ; record
      #;(Record (x t) ...)
      ; sum
      (Sum t t)
      ; list
-     (List t)))
+     (List t))
+  #;(Tuple ::=
+     TupleEmpty
+     (TupleCons t Tuple)))
 
 (define-metafunction stlc-syntax
   lookup : x Γ -> t
@@ -198,6 +213,35 @@
    ------ t-snd
    (⊢ Γ (snd e) x_t2)]
 
+  ; tuples
+  [(⊢★ Γ e★ t★)
+   ------ t-tuple
+   (⊢ Γ (tuple e★) (Tuple t★))]
+
+  [(⊢ Γ e t_e)
+   (where x★ ,(fresh-type-var★))
+   (con (t_e = (Tuple x★)))
+   (@t x★ n t)
+   ------ t-proj
+   (⊢ Γ (project e n) t)]
+   
+  #;[------ t-tuple-empty
+   (⊢ Γ tuple-empty TupleEmpty)]
+
+  #;[(⊢ Γ e t)
+   (⊢ Γ tuple Tuple)
+   ------ t-tuple-cons
+   (⊢ Γ (tuple-cons e tuple) (TupleCons t Tuple))]
+
+  #;[(⊢ Γ e t)
+   ------ t-project-zero
+   (⊢ Γ (project (tuple-cons e tuple) 0) t)]
+
+  #;[(side-condition ,(> (term n) 0))
+   (⊢ Γ (project tuple ,(- (term n) 1)) t)
+   ------ t-project-succ
+   (⊢ Γ (project (tuple-cons e tuple) n) t)]
+
   ; records
   ; TODO
 
@@ -277,13 +321,46 @@
    ------ t-calctype
    (⊢ Γ (calctype e_1 as t_1 in e_2) t_2)])
 
+; required for any lang
 (define-judgment-form stlc-syntax
   #:contract (con c)
   #:mode (con I)
   [------ t-equal
    (con q)]
   [------ t-judge
-   (con j)])
+   (con j)]
+  [------ t-assum
+   (con (assumption any))])
+
+; required for any lang
+(define-judgment-form stlc-syntax
+  #:contract (⊢★ Γ e★ t★)
+  #:mode (⊢★ I I O)
+
+  [(⊢ Γ e t) ...
+   ------ t-star
+   (⊢★ Γ (★ e ...) (★ t ...))]
+
+  [(where x★_t ,(atom-type-var★ (term a★)))
+   (con (,(unfreshen (term Γ)) ⊢ a★ : x★_t))
+   ------ t-atom★
+   (⊢★ Γ a★ x★_t)])
+
+
+; required for any lang
+(define-judgment-form stlc-syntax
+  #:contract (@t t★ n t)
+  #:mode (@t I I O)
+
+  [(where t ,(list-ref (term (t_i ...)) (term n)))
+   ------ t-a
+   (@t (★ t_i ...) n t)]
+
+  [(where x ,(fresh-type-var))
+   (con (assumption (x★ @ n = x)))
+   ------ t-b
+   (@t x★ n x)])
+
 
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -372,6 +449,22 @@
                                           (cons ~body (f (tail l))))))
                             in (f ~list))))))
 
+(define rule_tuple2
+  (rule "tuple2" #:fresh()
+        (tuple2 ~a ~b)
+        (tuple (★ ~a ~b))
+        #;(tuple-cons ~a (tuple-cons ~b tuple-empty))))
+
+(define rule_my-tuple
+  (rule "my-tuple" #:fresh()
+        (my-tuple ~★a)
+        (tuple ~★a)))
+
+(define rule_my-proj
+  (rule "my-proj" #:fresh()
+        (my-proj ~★a)
+        (project (tuple ~★a) 2)))
+
 (define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Num 'Bool
                           'true 'false 'Unit 'as 'case 'of 'inl 'inr '=>)) ; todo
 
@@ -381,7 +474,7 @@
 
 (show-derivations
  (map simply-resugar
-      (list rule_for-map)
+      (list rule_my-proj)
       #;(list rule_for-map rule_sum-map rule_sum-or
             rule_letrec rule_sametype rule_seq rule_or rule_let
             rule_not rule_unless

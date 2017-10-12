@@ -2,7 +2,8 @@
 
 (require redex)
 
-(provide resugar-rule unfreshen atom-type-var fresh-type-var (rename-out (make-rule rule))
+(provide resugar-rule unfreshen (rename-out (make-rule rule))
+         atom-type-var atom-type-var★ fresh-type-var fresh-type-var★
          (struct-out Resugared))
 
 ;; assumption: Redex model does not contain #f
@@ -40,8 +41,14 @@
 (define (fresh-type-var)
   (string->symbol (make-string 1 (next-char))))
 
+(define (fresh-type-var★)
+  (string->symbol (string-append "★" (make-string 1 (next-char)))))
+
 (define (atom-type-var atom)
   (fresh-type-var))
+
+(define (atom-type-var★ atom★)
+  (fresh-type-var★))
 
 
 ;; ------------------------------------------------------------
@@ -71,12 +78,16 @@
 
 (define-struct equation (left right))
 
+(define-struct assumption (contents))
+
 (define (read-eq eq)
   (match eq
     [(list a '= b)
      (equation a b)]
     [(list Γ '⊢ x ': t)
-     (judgement Γ x t)]))
+     (judgement Γ x t)]
+    [(list 'assumption contents)
+     (assumption contents)]))
 
 (define (write-eq x eq)
   (cond
@@ -100,6 +111,8 @@
      (list (cadr (derivation-term d)))]
     [(eq? (derivation-name d) "t-judge")
      (list (cadr (derivation-term d)))]
+    [(eq? (derivation-name d) "t-assum")
+     (list (cadr (derivation-term d)))]
     [else
      (apply append (map get-constraints (derivation-subs d)))]))
 
@@ -107,24 +120,35 @@
 ;; ------------------------------------------------------------
 ;; Unifications
 
+(define-struct unification (judgements types assumptions))
+
 (define (display-unification unif)
   (hash-for-each (unification-judgements unif)
                  (lambda (x j) (display-judgement j)))
   (hash-for-each (unification-types unif)
-                 (lambda (x t) (display (format "  ~a = ~a\n" x t)))))
-
-(define-struct unification (judgements types))
+                 (lambda (x t) (display (format "  ~a = ~a\n" x t))))
+  (map (lambda (x) (display (format "  ~a\n") x))
+       (unification-assumptions unif)))
 
 (define (new-unification)
-  (unification (make-immutable-hash) (make-immutable-hash)))
+  (unification (make-immutable-hash)
+               (make-immutable-hash)
+               (list)))
 
 (define (insert-judgement unif x j)
   (unification (hash-set (unification-judgements unif) x j)
-               (unification-types unif)))
+               (unification-types unif)
+               (unification-assumptions unif)))
 
 (define (insert-type unif x t)
   (unification (unification-judgements unif)
-               (hash-set (unification-types unif) x t)))
+               (hash-set (unification-types unif) x t)
+               (unification-assumptions unif)))
+
+(define (insert-assumption unif assum)
+  (unification (unification-judgements unif)
+               (unification-types unif)
+               (cons assum (unification-assumptions unif))))
 
 (define (lookup-judgement x unif)
   (hash-lookup (unification-judgements unif) x))
@@ -149,7 +173,8 @@
     [(list? expr)     (map recur expr)]
     [(unification? expr)
      (unification (map-hash recur (unification-judgements expr))
-                  (map-hash recur (unification-types expr)))]
+                  (map-hash recur (unification-types expr))
+                  (map recur (unification-assumptions expr)))] ; TODO: make robust
     [(judgement? expr)
      (judgement (recur (judgement-env expr))
                 (judgement-id expr)
@@ -197,10 +222,12 @@
 (define-struct Resugared (derivation rule))
 
 (define (make-sugar-rule name conclusion unif)
+  (let* ([make-assum (lambda (eq) (derivation eq "assume" (list)))]
+         [premises (map make-assum (unification-judgement-list unif))]
+         [assumptions (map make-assum (unification-assumptions unif))])
   (derivation (substitute unif conclusion)
               name
-              (map (lambda (eq) (derivation eq "assume" (list)))
-                   (unification-judgement-list unif))))
+              (append premises assumptions))))
 
 (define-syntax-rule (resugar-rule rule ty literals)
   (parameterize ([fresh-vars (DsRule-fresh rule)])
@@ -233,6 +260,8 @@
     [(list) unif]
     [(cons (equation x y) eqs)
      (unify eqs (equate x y unif))]
+    [(cons (assumption assum) eqs)
+     (unify eqs (insert-assumption unif assum))]
     [(cons (? judgement? j) eqs)
      (unify eqs (add-judgement j unif))]))
 
@@ -325,19 +354,3 @@
 
   (check-equal? (occurs? 'X 'X) true)
   (check-equal? (occurs? 'X '(List X)) true))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

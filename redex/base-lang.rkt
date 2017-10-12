@@ -21,9 +21,17 @@
   (e ::=
      a
      x)
+  (e★ ::=
+      a★
+      (★ e ...))
   (t ::= x)
+  (t★ ::=
+      x★
+      (★ t ...))
   (Γ ::= [(x : t) ...])
   (a ::= (variable-prefix ~))
+  (a★ ::= (variable-prefix ~★))
+  (x★ ::= (variable-prefix ★))
   (x ::= variable-not-otherwise-mentioned)
   (c ::=
      j
