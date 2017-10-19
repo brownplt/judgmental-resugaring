@@ -22,6 +22,10 @@
 
 ;; TODO:
 ;;   - allow sugars to build on each other
+;; Writing:
+;;   - type environment Γ
+;;   - globals
+;;   - recursive sugars
 
 (define-extended-language stlc-syntax base-syntax
   (e ::= ....
@@ -64,9 +68,6 @@
      ; builtin
      (calctype e as t in e))
   (x ::= variable-not-otherwise-mentioned)
-  #;(tuple ::=
-     tuple-empty
-     (tuple-cons e tuple))
   (v ::=
      ; booleans
      true
@@ -79,7 +80,6 @@
      (pair v v)
      ; tuple
      (tuple (★ v ...))
-     #;(tuple v ...)
      ; record
      #;(record (x v) ...)
      ; list
@@ -101,22 +101,22 @@
      (Pair t t)
      ; tuples
      (Tuple t★)
-     #;Tuple
-     ; record
-     #;(Record (x t) ...)
      ; sum
      (Sum t t)
      ; list
      (List t))
-  #;(Tuple ::=
-     TupleEmpty
-     (TupleCons t Tuple)))
+  (s ::= ....
+     (hlc s s)
+     (ands s★)))
 
 (define-metafunction stlc-syntax
   lookup : x Γ -> t
   [(lookup x [(x_1s : t_1s) ... (x : t) (x_2s : t_2s) ...])
    t
-   (side-condition (not (member (term x) (term (x_2s ...)))))])
+   (side-condition (not (member (term x) (term (x_2s ...)))))]
+  [(lookup x Γ)
+   ,(get-global (term x))
+   (side-condition (global-exists? (term x)))])
 
 (define-metafunction stlc-syntax
   extend : Γ x t -> Γ
@@ -224,23 +224,6 @@
    (@t x★ n t)
    ------ t-proj
    (⊢ Γ (project e n) t)]
-   
-  #;[------ t-tuple-empty
-   (⊢ Γ tuple-empty TupleEmpty)]
-
-  #;[(⊢ Γ e t)
-   (⊢ Γ tuple Tuple)
-   ------ t-tuple-cons
-   (⊢ Γ (tuple-cons e tuple) (TupleCons t Tuple))]
-
-  #;[(⊢ Γ e t)
-   ------ t-project-zero
-   (⊢ Γ (project (tuple-cons e tuple) 0) t)]
-
-  #;[(side-condition ,(> (term n) 0))
-   (⊢ Γ (project tuple ,(- (term n) 1)) t)
-   ------ t-project-succ
-   (⊢ Γ (project (tuple-cons e tuple) n) t)]
 
   ; records
   ; TODO
@@ -309,10 +292,10 @@
    (⊢ Γ (tail e) t)]
 
   ; required for any lang
-  [(where x_t ,(atom-type-var (term a))) ; TODO: safety checks!
-   (con (,(unfreshen (term Γ)) ⊢ a : x_t))
+  [(where x_t ,(atom-type-var (term s))) ; TODO: safety checks!
+   (con (,(unfreshen (term Γ)) ⊢ s : x_t))
    ------ t-atom
-   (⊢ Γ a x_t)]
+   (⊢ Γ s x_t)]
 
   ; required for any lang
   [(⊢ Γ e_1 t_3)
@@ -452,8 +435,7 @@
 (define rule_tuple2
   (rule "tuple2" #:fresh()
         (tuple2 ~a ~b)
-        (tuple (★ ~a ~b))
-        #;(tuple-cons ~a (tuple-cons ~b tuple-empty))))
+        (tuple (★ ~a ~b))))
 
 (define rule_my-tuple
   (rule "my-tuple" #:fresh()
@@ -465,20 +447,61 @@
         (my-proj ~★a)
         (project (tuple ~★a) 2)))
 
+;; Haskell List Comprehensions ;;
+
+; [e | b, Q] = if b then [e | Q] else []
+(define rule_hlc-guard
+  (rule "hlc-guard" #:fresh()
+        (hlc ~e (hlc/guard ~b ~Q))
+        (if ~b (hlc ~e ~Q) nil)))
+
+; [e | p <- l, Q] = let ok p = [e | Q]
+;                       ok _ = []
+;                    in concatMap ok l
+; TODO: handle the underscore stuff
+(define rule_hlc-bind
+  (rule "hlc-bind" #:fresh(f l t)
+        (hlc ~e (hlc/bind x ~l ~Q)) ; [e | x <- l, Q]
+        (calctype ~l as (List t) in ; concatMap (\x. [e | Q]) l
+                  ((concatMap (λ (x : t) (hlc ~e ~Q))) ~l))))
+ 
+; [e | let decls, Q] = let decls in [e | Q]
+; TODO: this is singleton let
+(define rule_hlc-let
+  (rule "hlc-let" #:fresh()
+        (hlc ~e (hlc/let x = ~a in ~Q))
+        (let! x = ~a in (hlc ~e ~Q))))
+
+; ellipses example
+(define rule_ands-empty
+  (rule "ands-empty" #:fresh()
+        (ands (★ ~a))
+        ~a))
+
+(define rule_ands-cons
+  (rule "ands-cons" #:fresh()
+        (ands (★ ~a ~b ~★cs))
+        (if ~a true (ands (★ ~b ~★cs)))))
+
 (define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Num 'Bool
                           'true 'false 'Unit 'as 'case 'of 'inl 'inr '=>)) ; todo
 
+(define the-globals
+  (make-immutable-hash '((concatMap . ((i -> (List o))
+                                       -> ((List i) -> (List o)))))))
+
 (define (simply-resugar r)
-  (let ([resugared (resugar-rule r ⊢ the-literals)])
+  (let ([resugared (resugar-rule r ⊢ the-literals the-globals)])
     (Resugared-rule resugared)))
 
 (show-derivations
  (map simply-resugar
-      (list rule_my-proj)
+      (list rule_ands-empty rule_ands-cons)
+      #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
       #;(list rule_for-map rule_sum-map rule_sum-or
             rule_letrec rule_sametype rule_seq rule_or rule_let
             rule_not rule_unless
             rule_ifzero rule_thunk rule_let-pair)))
 
-(define-syntax-rule (test-match x)
+(define-syntax-rule (test-match e x)
   (redex-match stlc-syntax e (term x)))

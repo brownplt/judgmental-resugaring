@@ -1,9 +1,11 @@
 #lang racket
 
 (require redex)
+(require "base-lang.rkt")
 
 (provide resugar-rule unfreshen (rename-out (make-rule rule))
          atom-type-var atom-type-var★ fresh-type-var fresh-type-var★
+         get-global global-exists?
          (struct-out Resugared))
 
 ;; assumption: Redex model does not contain #f
@@ -52,7 +54,7 @@
 
 
 ;; ------------------------------------------------------------
-;; Language Literals
+;; Language Literals & Globals
 
 (define language-literals (make-parameter (set)))
 
@@ -63,6 +65,14 @@
 (define (literal? x)
   (and (symbol? x)
        (set-member? (language-literals) x)))
+
+(define language-globals (make-parameter (make-immutable-hash)))
+
+(define (global-exists? x)
+  (hash-has-key? (language-globals) x))
+
+(define (get-global x)
+  (hash-ref (language-globals) x))
 
 
 ;; ------------------------------------------------------------
@@ -229,8 +239,10 @@
               name
               (append premises assumptions))))
 
-(define-syntax-rule (resugar-rule rule ty literals)
-  (parameterize ([fresh-vars (DsRule-fresh rule)])
+(define-syntax-rule (resugar-rule rule ty literals globals)
+  (parameterize ([fresh-vars (DsRule-fresh rule)]
+                 [language-literals literals]
+                 [language-globals globals])
     (reset-char!)
     (let [[derivations (build-derivations (ty [] ,(DsRule-rhs rule) _))]]
       (when (not (eq? 1 (length derivations)))
@@ -239,17 +251,16 @@
                (length derivations)
                (DsRule-name rule)))
       (let [[deriv (first derivations)]]
-        (parameterize [[language-literals literals]]
-          (display "Deriv found!") (newline)
-          (display deriv) (newline)
-          (let* [[unif (unify (map read-eq (get-constraints deriv))
-                              (new-unification))]
-                 [concl-type (fourth (derivation-term deriv))]
-                 [concl-env (second (derivation-term deriv))]
-                 [concl (list concl-env '⊢ (term ,(DsRule-lhs rule)) ': concl-type)]]
-            (Resugared
-             deriv
-             (make-sugar-rule (DsRule-name rule) concl unif))))))))
+        (display "Deriv found!") (newline)
+        (display deriv) (newline)
+        (let* [[unif (unify (map read-eq (get-constraints deriv))
+                            (new-unification))]
+               [concl-type (fourth (derivation-term deriv))]
+               [concl-env (second (derivation-term deriv))]
+               [concl (list concl-env '⊢ (term ,(DsRule-lhs rule)) ': concl-type)]]
+          (Resugared
+           deriv
+           (make-sugar-rule (DsRule-name rule) concl unif)))))))
 
 
 ;; ------------------------------------------------------------
@@ -308,6 +319,40 @@
     ; symmetric case
     [[x (? literal? y)]
      (equate y x unif)]
+    ; ellipses
+    [[(list '★ x ... (? ellipsis-var? xs))
+      (list '★ y ... (? ellipsis-var? ys))]
+     (if (<= (length x) (length y))
+         (let [[head (take y (length x))]
+               [tail (drop y (length x))]]
+           (equate (foldl equate unif x head)
+                   xs
+                   (append tail (list ys))))
+         (let [[head (take x (length y))]
+               [tail (drop x (length y))]]
+           (equate (foldl equate unif y head)
+                   ys
+                   (append tail (list xs)))))]
+    ; ellipses
+    [[(list '★ x ... (? ellipsis-var? xs))
+      (list '★ y ...)]
+     (if (<= (length x) (length y))
+         (let [[head (take y (length x))]
+               [tail (drop y (length x))]]
+           (equate (foldl equate unif x head)
+                   xs
+                   tail))
+         (unification-error (append x (list xs)) y))]
+    ; symmetric case
+    [[(list '★ _x ...)
+      (list '★ _y ... (? ellipsis-var? _ys))]
+     (equate y x)]
+    ; ellipses
+    [[(list '★ x ...)
+      (list '★ y ...)]
+     (if (equal? (length x) (length y))
+         (foldl equate unif x y)
+         (unification-error x y))]
     ; Compound expressions
     [[(list-rest xs) (list-rest ys)]
      (when (not (equal? (length xs) (length ys)))
