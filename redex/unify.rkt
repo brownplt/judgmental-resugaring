@@ -59,7 +59,7 @@
   (set! the-char (char->integer #\A)))
 
 (define (fresh-type-var)
-  (string->symbol (string-append "$" (make-string 1 (next-char)))))
+  (string->symbol (make-string 1 (next-char))))
 
 (define (atom->type-var atom)
   (fresh-type-var))
@@ -70,7 +70,7 @@
 
 (define language-literals (make-parameter (set)))
 
-(define meta-literals (set 'cons 'field 'ϵ ': '=))
+(define meta-literals (set 'cons 'field 'ϵ))
 
 (define (variable? x)
   (and (symbol? x)
@@ -82,12 +82,18 @@
        (set-member? (language-literals) x)))
 
 (define (get-variables t)
-  (cond
-    [(variable? t) (set t)]
-    [(literal? t) (set)]
-    [(number? t) (set)]
-    [(list? t) (foldl set-union (set) (map get-variables t))]
-    [else (error 'get-variables "fell off cond ~a" t)]))
+  (match t
+    [(? variable?) (set t)]
+    [(? literal?)  (set)]
+    [(? number?)   (set)]
+    ['ϵ            (set)]
+    [(list 'cons expr exprs)
+     (set-union (get-variables expr) (get-variables exprs))]
+    [(list 'field x expr exprs)
+     (set-union (get-variables expr) (get-variables exprs))]
+    [(? list?)
+     (foldl set-union (set) (map get-variables t))]
+    [_ (error 'get-variables "fell off match ~a" t)]))
 
 
 
@@ -489,9 +495,9 @@
                         (equate 'd '(field c Z (field b W row2))
                                 (new-unification))))
   (check-expect (substitute unif4 '(d row1 row2))
-                '((field c Z (field b Y (field a X $A)))
-                  (field c Z $A)
-                  (field a X $A)))
+                '((field c Z (field b Y (field a X A)))
+                  (field c Z A)
+                  (field a X A)))
   
   (define unif5 (equate '(field a X (field b X ϵ))
                         '(field a Y row)

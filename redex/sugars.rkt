@@ -155,6 +155,19 @@
         (method (arg : t) ~body)
         (λ (obj : o) (λ (arg : t) (let! this = obj in ~body)))))
 
+; records
+(define rule_rec-point
+  (rule "rec-point" #:capture()
+        (rec-point ~a ~b)
+        (record (field x ~a (field y ~b ϵ)))))
+
+(define rule_rec-sum
+  (rule "rec-sum" #:capture()
+        (rec-sum ~rec x y)
+        (let! r = ~rec in
+              (+ (dot r x)
+                 (dot r y)))))
+
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; Resugaring
@@ -169,7 +182,8 @@
 
 (show-derivations
  (map simply-resugar
-      (list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
+      (list rule_rec-point rule_rec-sum)
+      #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
       #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
       #;(list
        rule_method

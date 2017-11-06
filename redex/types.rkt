@@ -45,6 +45,7 @@
      (succ e)
      (pred e)
      (iszero e)
+     (+ e e) ; added for convenience
      ; stlc
      (e e)
      (λ (x : t) e)
@@ -169,6 +170,13 @@
    (con (t = Nat))
    ------ t-iszero
    (⊢ Γ (iszero e) Bool)]
+
+  [(⊢ Γ e_1 t_1)
+   (⊢ Γ e_2 t_2)
+   (con (t_1 = Nat))
+   (con (t_2 = Nat))
+   ------ t-sum
+   (⊢ Γ (+ e_1 e_2) Nat)]
 
   ; stlc
   [(side-condition ,(not (string-prefix? (symbol->string (term x)) "~"))) ; exclude atoms
@@ -302,13 +310,17 @@
    (⊢ Γ (tail e) t)]
 
   ; record
-  [
+  [(⊢rec Γ eRec tRec)
    ------ t-rec
-   ]
+   (⊢ Γ (record eRec) (Record tRec))]
 
-  [
+  [(⊢ Γ e t_e)
+   (where x_rec ,(fresh-type-var))
+   (con (t_e = (Record x_rec)))
+   (rec@t x_rec x t)
+   #;(rec@t x_rec x t)
    ------ t-dot
-   ]
+   (⊢ Γ (dot e x) t)]
 
   ; required for any lang
   [(where x_t ,(atom->type-var (term s))) ; TODO: safety checks!
@@ -351,6 +363,37 @@
    (con (,(unfreshen (term Γ)) ⊢ a : x_t*))
    ------ t-premise*
    (⊢* Γ a x_t*)])
+
+; required for any lang
+(define-judgment-form stlc-syntax
+  #:contract (⊢rec Γ eRec tRec)
+  #:mode (⊢rec I I O)
+
+  [(⊢ Γ e t)
+   (⊢rec Γ eRec tRec)
+   ------ t-rec-cons
+   (⊢rec Γ (field x e eRec) (field x t tRec))]
+
+  [------ t-rec-empty
+   (⊢rec Γ ϵ ϵ)])
+
+
+; required for any lang
+(define-judgment-form stlc-syntax
+  #:contract (rec@t tRec x t)
+  #:mode (rec@t I I O)
+
+  [------ t-rec-at-base
+   (rec@t (field x t tRec) x t)]
+
+  [(rec@t tRec x t)
+   ------ t-rec-at-recur
+   (rec@t (field x_2 t_2 tRec) x t)]
+
+  [(where x_t ,(fresh-type-var))
+   (con (assumption (x_rec @ x = x_t)))
+   ------ t-rec-at-premise
+   (rec@t x_rec x x_t)])
 
 
 ; required for any lang
