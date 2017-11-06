@@ -16,11 +16,18 @@
 ;;   ascription (TAPL pg.122)
 ;;   let        (TAPL pg.124) (called let_)
 ;;   pairs      (TAPL pg.126)
-;;   tuples     (TAPL pg.128) -- TODO, subsumes pairs
+;;   tuples     (TAPL pg.128) (subsumes pairs)
 ;;   records    (TAPL pg.129) -- TODO, subsumes tuples? Needs row types?
 ;;   sums       (TAPL pg.132) (uniq typing on pg. 135 irrelevant w/ T.I.)
 ;;   fix        (TAPL pg.144)
-;;   lists      (TAPL pg.147) -- TODO
+;;   lists      (TAPL pg.147)
+;;   refs       (TAPL pg.166) -- TODO
+;;   errors     (TAPL pg.175) -- TODO (skipping the tiny pre-version)
+;;   subtyping  (TAPL pg.186) -- TODO
+;;   subty-rec  (TAPL pg.197) -- TODO
+;;   subty-bot  (TAPL pg.192) -- TODO
+;;   subty-var  (TAPL pg.197) -- TODO
+;;   alg-subty  pg. 211, 212, 217
 
 ;; TODO:
 ;;   - allow sugars to build on each other
@@ -53,7 +60,7 @@
      (tuple e*)
      (project e n)
      ; record
-     #;(record (x e) ...)
+     (record eRec)
      (dot e x)
      ; sum
      (inl e)
@@ -76,14 +83,12 @@
      false
      ; numbers
      n
-     ; unit
-     unit
      ; pair
      (pair v v)
      ; tuple
      (tuple v*)
      ; record
-     #;(record (x v) ...)
+     ;(record (x v) ...)
      ; list
      nil
      (cons v v))
@@ -106,6 +111,8 @@
      (Tuple t*)
      ; sum
      (Sum t t)
+     ; record
+     (Record tRec)
      ; list
      (List t))
   (s ::= ....
@@ -293,6 +300,15 @@
    (con (t = (List x_t)))
    ------ t-tail
    (⊢ Γ (tail e) t)]
+
+  ; record
+  [
+   ------ t-rec
+   ]
+
+  [
+   ------ t-dot
+   ]
 
   ; required for any lang
   [(where x_t ,(atom->type-var (term s))) ; TODO: safety checks!

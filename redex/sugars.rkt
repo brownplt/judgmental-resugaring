@@ -139,6 +139,11 @@
         (ands (cons ~a ϵ))
         ~a))
 
+(define rule_ands-empty-fixed
+  (rule "ands-empty-fixed" #:capture()
+        (ands (cons ~a ϵ))
+        (calctype ~a as Bool in ~a)))
+
 (define rule_ands-cons
   (rule "ands-cons" #:capture()
         (ands (cons ~a (cons ~b ~cs)))
@@ -164,9 +169,9 @@
 
 (show-derivations
  (map simply-resugar
-      #;(list rule_ands-empty rule_ands-cons)
+      (list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
       #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
-      (list
+      #;(list
        rule_method
        rule_hlc-bind rule_hlc-guard rule_hlc-let
        rule_for-map rule_sum-map rule_sum-or

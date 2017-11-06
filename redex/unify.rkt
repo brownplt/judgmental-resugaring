@@ -59,7 +59,7 @@
   (set! the-char (char->integer #\A)))
 
 (define (fresh-type-var)
-  (string->symbol (make-string 1 (next-char))))
+  (string->symbol (string-append "$" (make-string 1 (next-char)))))
 
 (define (atom->type-var atom)
   (fresh-type-var))
@@ -70,9 +70,12 @@
 
 (define language-literals (make-parameter (set)))
 
+(define meta-literals (set 'cons 'field 'ϵ ': '=))
+
 (define (variable? x)
   (and (symbol? x)
-       (not (set-member? (language-literals) x))))
+       (and (not (set-member? (language-literals) x))
+            (not (set-member? meta-literals x)))))
 
 (define (literal? x)
   (and (symbol? x)
@@ -206,43 +209,58 @@
 (define (replace x t expr)
   (define (recur expr)
     (replace x t expr))
-  (cond
-    [(variable? expr) (if (equal? expr x) t expr)]
-    [(literal? expr)  expr]
-    [(list? expr)     (map recur expr)]
-    [(Unification? expr)
+  (match expr
+    [(? variable? expr)
+     (if (equal? expr x) t expr)]
+    [(? literal? expr)  expr]
+    ['ϵ 'ϵ]
+    [(list 'cons expr exprs)
+     (list 'cons (recur expr) (recur exprs))]
+    [(list 'field x expr exprs)
+     (list 'field x (recur expr) (recur exprs))]
+    [(? list? expr)
+     (map recur expr)]
+    [(? Unification? expr)
      (Unification (map-hash recur (Unification-judgements expr))
                   (map-hash recur (Unification-types expr))
                   (map recur (Unification-assumptions expr)))] ; TODO: make robust
-    [(Judgement? expr)
+    [(? Judgement? expr)
      (Judgement (recur (Judgement-env expr))
                 (Judgement-id expr)
                 (recur (Judgement-type expr)))]
-    [else (error 'replace "fell off cond")]))
+    [_ (error 'replace "fell off match")]))
 
 (define (substitute unif t)
   (define (recur t) (substitute unif t))
-  (cond
-    [(literal? t) t]
-    [(variable? t)
+  (match t
+    [(? literal? t) t]
+    [(? variable? t)
      (match (lookup-type t unif)
        [#f t]
        [t2 t2])]
-    [(list? t)
+    ['ϵ 'ϵ]
+    [(list 'cons t ts)
+     (list 'cons (recur t) (recur ts))]
+    [(list 'field x t ts)
+     (list 'field x (recur t) (recur ts))]
+    [(? list? t)
      (map recur t)]
-    [(Judgement? t)
+    [(? Judgement? t)
      (Judgement (recur (Judgement-env t))
                 (Judgement-id t)
                 (recur (Judgement-type t)))]
-    [else (error 'substitute "fell off cond ~a" t)]))
+    [_ (error 'substitute "fell off cond ~a" t)]))
 
 (define (occurs? x t)
   (define (recur t) (occurs? x t))
-  (cond
-    [(variable? t) (equal? x t)]
-    [(literal? t)  #f]
-    [(list? t)     (ormap recur t)]
-    [else          (error 'occurs? "fell off cond")]))
+  (match t
+    [(? variable? t)      (equal? x t)]
+    [(? literal? t)       #f]
+    ['ϵ                   #f]
+    [(list 'cons t ts)    (or (recur t) (recur ts))]
+    [(list 'field _ t ts) (or (recur t) (recur ts))]
+    [(? list? t)          (ormap recur t)]
+    [else                 (error 'occurs? "fell off match")]))
 
 
 ;; ------------------------------------------------------------
@@ -327,6 +345,34 @@
   (equate Γ1 Γ2 unif))
 
 (define (equate x y unif)
+    
+  (define (take-field fld rec)
+    (match rec
+      ['ϵ (values #f rec)]
+      [(? variable? _) (values #f rec)]
+      [(list 'field x val rest)
+       (if (equal? fld x)
+           (values val rest)
+           (let-values [[[val* rec*] (take-field fld rest)]]
+             (if val*
+                 (values val* (list 'field x val rec*))
+                 (values #f rec))))]))
+  
+  (define (equate-fields rec1 rec2 unif)
+    (define (recur rec1 rec2 um1 um2 unif)
+      (match* [rec1 rec2]
+        [[(list 'field x val1 rec1) _]
+         (let-values [[[val2 rec2] (take-field x rec2)]]
+           (if val2
+               (equate val1 val2 (recur rec1 rec2 um1 um2 unif))
+               (recur rec1 rec2 (list 'field x val1 um1) um2 unif)))]
+      [[_ (list 'field y val2 rec2)]
+       (recur rec1 rec2 um1 (list 'field y val2 um2) unif)]
+      [[(or 'ϵ (? variable?)) (or 'ϵ (? variable?))]
+       (equate rec1 um2 (equate rec2 um1 unif))]))
+    (let [[t (fresh-type-var)]]
+      (recur rec1 rec2 t t unif)))
+
   (match* [x y]
     [[(? variable? x) t]
      ; Maintain the invarient that `subs` is a well-formed substitution:
@@ -353,8 +399,12 @@
     ; lists
     [['ϵ 'ϵ]
      unif]
-    [[(list x ': xs) (list y ': ys)]
+    [[(list 'cons x xs) (list 'cons y ys)]
      (equate x y (equate xs ys unif))]
+    ; records
+    [[(list 'field _ _ _)
+      (list 'field _ _ _)]
+     (equate-fields x y unif)]
     ; Compound expressions - TODO: not general
     [[(list-rest xs) (list-rest ys)]
      (when (not (equal? (length xs) (length ys)))
@@ -363,6 +413,40 @@
     ; Do not match
     [[_ _]
      (unification-error x y)]))
+
+; Take two sets of record fields as arguments, rec1 & rec2.
+; Try to 'match' them, findings fields of the same name.
+; Produce (matched field-values of rec1,
+;          matched field-values of rec2,
+;          unmatched fields of rec1,
+;          unmatched fields of rec2).
+(define (match-fields rec1 rec2)
+  
+  (define (take-first-field rec)
+    (values (caar rec) (cadar rec) (cdr rec)))
+  
+  (define (take-field fld rec)
+    (cond [(empty? rec)
+           (values #f rec)]
+          [(equal? (caar rec) fld)
+           (values (cadar rec) (cdr rec))]
+          [else
+           (let-values [[[val rec*] (take-field fld (cdr rec))]]
+             (if val
+                 (values val (cons (car rec) rec*))
+                 (values #f rec)))]))
+  
+  (define (recur rec1 rec2 m1 m2 um1)
+    (if (empty? rec1)
+        (values m1 m2 um1 rec2)
+        (let-values [[[fld val rec1] (take-first-field rec1)]]
+          (let-values [[[found rec2] (take-field fld rec2)]]
+            (if found
+                (recur rec1 rec2 (cons val m1) (cons found m2) um1)
+                (recur rec1 rec2 m1 m2 (cons (list fld val) um1)))))))
+
+  (recur rec1 rec2 empty empty empty))
+
 
 
 ;; ------------------------------------------------------------
@@ -386,17 +470,43 @@
 ;; Tests
 
 (module+ test
-  (require rackunit)
+  (require test-engine/racket-tests)
   
   (define unif1 (equate 'Y 'Y (new-unification)))
-  (check-equal? (hash-count (Unification-types unif1)) 0)
+  (check-expect (hash-count (Unification-types unif1)) 0)
   
   (define unif2 (equate 'X 'Y (new-unification)))
-  (check-equal? (substitute unif2 (list (list 'X))) (list (list 'Y)))
+  (check-expect (substitute unif2 (list (list 'X))) (list (list 'Y)))
 
   (define unif3 (equate 'B 'C (equate 'A (list 'B 'C) (new-unification))))
-  (check-equal? (substitute unif3 'B) 'C)
-  (check-equal? (substitute unif3 'A) (list 'C 'C))
+  (check-expect (substitute unif3 'B) 'C)
+  (check-expect (substitute unif3 'A) (list 'C 'C))
 
-  (check-equal? (occurs? 'X 'X) true)
-  (check-equal? (occurs? 'X '(List X)) true))
+  (check-expect (occurs? 'X 'X) true)
+  (check-expect (occurs? 'X '(List X)) true)
+
+  (define unif4 (equate '(field a X (field b Y row1)) 'd
+                        (equate 'd '(field c Z (field b W row2))
+                                (new-unification))))
+  (check-expect (substitute unif4 '(d row1 row2))
+                '((field c Z (field b Y (field a X $A)))
+                  (field c Z $A)
+                  (field a X $A)))
+  
+  (define unif5 (equate '(field a X (field b X ϵ))
+                        '(field a Y row)
+                        (new-unification)))
+  (check-expect (substitute unif5 'row)
+                '(field b Y ϵ))
+
+  (define unif6 (equate '(field a Y (field b Z ϵ)) 'r
+                        (equate '(field a X (field b X ϵ)) 'r
+                                (new-unification))))
+  (check-expect (substitute unif6 'r)
+                '(field a Y (field b Y ϵ)))
+
+  (check-error (equate '(field a X ϵ)
+                       '(field a Y (field b Z row))
+                       (new-unification)))
+
+  (test))
