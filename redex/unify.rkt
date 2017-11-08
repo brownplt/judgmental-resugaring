@@ -131,6 +131,8 @@
   (match p
     [(list a '= b)
      (Equation a b)]
+    [(list '⋖ a b)
+     (Assumption (list '⋖ a b))]
     [(list Γ '⊢ x ': t)
      (Judgement Γ x t)]
     [(list 'assumption contents)
@@ -154,11 +156,7 @@
   (when (not (derivation? d))
     (error 'get-premises "expected a derivation, but found ~a" d))
   (cond
-    [(eq? (derivation-name d) "t-equal")
-     (list (cadr (derivation-term d)))]
-    [(eq? (derivation-name d) "t-judge")
-     (list (cadr (derivation-term d)))]
-    [(eq? (derivation-name d) "t-assum")
+    [(string-prefix? (derivation-name d) "con-")
      (list (cadr (derivation-term d)))]
     [else
      (apply append (map get-premises (derivation-subs d)))]))
@@ -249,6 +247,8 @@
      (list 'cons (recur t) (recur ts))]
     [(list 'field x t ts)
      (list 'field x (recur t) (recur ts))]
+    [(list x '⋖ y)
+     (list (substitute unif x) '⋖ (substitute unif y))]
     [(? list? t)
      (map recur t)]
     [(? Judgement? t)
@@ -293,13 +293,27 @@
 (define (make-sugar-rule name conclusion unif)
   (let* ([make-assum (lambda (eq) (derivation eq "assume" (list)))]
          [premises (map make-assum (unification-judgement-list unif))]
-         [assumptions (map make-assum (Unification-assumptions unif))])
+         [assumptions (map (λ (a) (make-assum (substitute unif a)))
+                           (Unification-assumptions unif))])
   (derivation (substitute unif conclusion)
               name
               (append premises assumptions))))
 
 (define (found-derivation! deriv)
   (printf "Derivation found!\n~a\n" deriv))
+
+#;(define (resugar-premise unif premise)
+  (let [[premise (substitute unif premise)]]
+    (let [[derivs
+           (match premise
+             [(list '⋖ a b)
+              (printf "RESUGARING PREMISE")
+              (build-derivations (⋖ ,a ,b))]
+             [_ (list)])]]
+      (match (length derivs)
+        [0 (list premise)]
+        [1 (get-premises (first derivs))]
+        [_ (error/ambiguous-premise premise)]))))
 
 (define (resugar-derivation rule deriv)
   (let* [[premises (map read-premise (get-premises deriv))]

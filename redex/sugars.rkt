@@ -25,22 +25,22 @@
 (define rule_thunk
   (rule "thunk" #:capture()
         (thunk ~a)
-        (λ (x : Nat) ~a)))
+        (λ ((x : Nat)) ~a)))
 
 (define rule_let
   (rule "let" #:capture()
         (let x = ~a in ~b)
-        (calctype ~a as t in ((λ (x : t) ~b) ~a))))
+        (calctype ~a as t in (apply (λ ((x : t)) ~b) ~a))))
 
 (define rule_or
   (rule "or" #:capture()
         (or ~a ~b)
-        ((λ (x : Bool) (if x x ~b)) ~a)))
+        (apply (λ ((x : Bool)) (if x x ~b)) ~a)))
 
 (define rule_seq
   (rule "seq" #:capture()
         (seq ~a ~b)
-        ((λ (x : Unit) ~b) ~a)))
+        (apply (λ ((x : Unit)) ~b) ~a)))
 
 (define rule_sametype
   (rule "sametype" #:capture()
@@ -75,15 +75,15 @@
 (define rule_letrec
   (rule "letrec" #:capture()
         (letrec x : ~t = ~a in ~b)
-        (let! x = (fix (λ (x : ~t) ~a)) in ~b)))
+        (let! x = (fix (λ ((x : ~t)) ~a)) in ~b)))
 
 (define rule_for-map
   (rule "for-map" #:capture()
         (for-map x ~list ~body)
         (calctype ~list as (List elem) in
-         (calctype (λ (x : elem) ~body) as (elem -> out) in
+         (calctype (λ ((x : elem)) ~body) as (elem -> out) in
                    (letrec! f : ((List elem) -> (List out))
-                            = (λ (l : (List elem))
+                            = (λ ((l : (List elem)))
                                 (if (isnil l)
                                     nil
                                     (let! x = (head l) in
@@ -108,7 +108,7 @@
 ;; Haskell List Comprehensions ;;
 
 (define-global 'concatMap
-  (term ((i -> (List o)) -> ((List i) -> (List o)))))
+  (term ((i -> (List o)) (List i) -> (List o))))
 
 ; [e | b, Q] = if b then [e | Q] else []
 (define rule_hlc-guard
@@ -124,7 +124,7 @@
   (rule "hlc-bind" #:capture()
         (hlc ~e (hlc/bind x ~l ~Q)) ; [e | x <- l, Q]
         (calctype ~l as (List t) in ; concatMap (\x. [e | Q]) l
-                  ((concatMap (λ (x : t) (hlc ~e ~Q))) ~l))))
+                  (apply concatMap (λ ((x : t)) (hlc ~e ~Q)) ~l))))
  
 ; [e | let decls, Q] = let decls in [e | Q]
 ; TODO: this is singleton let
@@ -153,7 +153,7 @@
 (define rule_method
   (rule "method" #:capture(this)
         (method (arg : t) ~body)
-        (λ (obj : o) (λ (arg : t) (let! this = obj in ~body)))))
+        (λ ((obj : o)) (λ ((arg : t)) (let! this = obj in ~body)))))
 
 ; records
 (define rule_rec-point
@@ -167,6 +167,13 @@
         (let! r = ~rec in
               (+ (dot r x)
                  (dot r y)))))
+
+(define rule_myapp
+  (rule "myapp" #:capture()
+        (myapp ~fun ~arg)
+        (~fun ~arg)))
+
+
 
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -182,7 +189,8 @@
 
 (show-derivations
  (map simply-resugar
-      (list rule_rec-point rule_rec-sum)
+      #;(list rule_myapp)
+      #;(list rule_rec-point rule_rec-sum)
       #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
       #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
       #;(list

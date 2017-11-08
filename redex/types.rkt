@@ -47,8 +47,8 @@
      (iszero e)
      (+ e e) ; added for convenience
      ; stlc
-     (e e)
-     (λ (x : t) e)
+     (apply e ...)
+     (λ ((x : t) ...) e)
      ; ascription
      (e as t)
      ; let
@@ -105,7 +105,7 @@
      ; unit
      Unit
      ; stlc
-     (t -> t)
+     (t ... -> t)
      ; pairs
      (Pair t t)
      ; tuples
@@ -115,10 +115,23 @@
      ; record
      (Record tRec)
      ; list
-     (List t))
+     (List t)
+     ; subtyping
+     Top)
   (s ::= ....
      (hlc s s)
-     (ands s*)))
+     (ands s*)
+     (class x extends x class-body rest)
+     (call s x s*)
+     (new x s*)
+     (cast x s))
+  (class-body ::= { class-fields & class-constructor & class-methods })
+  (class-fields ::= sRec)
+  (class-constructor ::= (constructor ((x : t) ...) {
+                           (super x ...)
+                           ((x = x) ...)
+                         }))
+  (class-methods ::= (method ((x : t) ...) -> t { t })))
 
 (define-metafunction stlc-syntax
   lookup : x Γ -> t
@@ -133,6 +146,11 @@
   extend : Γ x t -> Γ
   [(extend [(x_s : t_s) ...] x t)
    [(x_s : t_s) ... (x : t)]])
+
+(define-metafunction stlc-syntax
+  append : Γ Γ -> Γ
+  [(append [(x_1 : t_1) ...] [(x_2 : t_2) ...])
+   [(x_1 : t_1) ... (x_2 : t_2) ...]])
 
 
 ;(define-extended-judgment-form stlc-syntax =>base
@@ -184,16 +202,30 @@
    ------ t-id
    (⊢ Γ x t)]
   
-  [(⊢ (extend Γ x t_1) e t_2)
+  #;[(⊢ (extend Γ x t_1) e t_2)
    ------ t-lambda
    (⊢ Γ (λ (x : t_1) e) (t_1 -> t_2))]
 
-  [(⊢ Γ e_fun t_fun)
+  #;[(⊢ Γ e_fun t_fun)
    (⊢ Γ e_arg t_arg)
    (where x_t ,(fresh-type-var))
-   (con (t_fun = (t_arg -> x_t)))
+   #;(where x_arg ,(fresh-type-var)) ; subtyping
+   (con (t_fun = (t_arg -> x_t))) ; subtyping (x_arg vs. t_arg)
+   #;(⋖ t_arg x_arg) ; subtyping
    ------ t-apply
    (⊢ Γ (e_fun e_arg) x_t)]
+
+  ; multi-arity functions
+  [(⊢ (append Γ [(x : t) ...]) e t_e)
+   ------ t-lambda*
+   (⊢ Γ (λ ((x : t) ...) e) (t ... -> t_e))]
+
+  [(⊢ Γ e_fun t_fun)
+   (⊢ Γ e_arg t_arg) ...
+   (where x_ret ,(fresh-type-var))
+   (con (t_fun = (t_arg ... -> x_ret)))
+   ------ t-apply*
+   (⊢ Γ (apply e_fun e_arg ...) x_ret)]
 
   ; unit
   [------ t-unit
@@ -317,8 +349,7 @@
   [(⊢ Γ e t_e)
    (where x_rec ,(fresh-type-var))
    (con (t_e = (Record x_rec)))
-   (rec@t x_rec x t)
-   #;(rec@t x_rec x t)
+   (@rec x_rec x t)
    ------ t-dot
    (⊢ Γ (dot e x) t)]
 
@@ -335,15 +366,63 @@
    ------ t-calctype
    (⊢ Γ (calctype e_1 as t_1 in e_2) t_2)])
 
+
+; subtyping
+(define-judgment-form stlc-syntax
+  #:contract (⋖ t t)
+  #:mode     (⋖ I I)
+  
+  [------ t-sub-top
+   (⋖ t Top)]
+
+  [(⋖ t_1 t_1*)
+   (⋖ t_2* t_2)
+   ------ t-sub-arrow
+   (⋖ (t_1* -> t_2*) (t_1 -> t_2))]
+
+  [(⋖rec tRec1 tRec2)
+   ------ t-sub-record
+   (⋖ (Record tRec1) (Record tRec2))]
+
+  [(con (⋖ x t))
+   ------ t-sub-premise1
+   (⋖ x t)]
+
+  [(con (⋖ t x))
+   (side-condition ,(not (redex-match stlc-syntax x (term t))))
+   ------ t-sub-premise2
+   (⋖ t x)])
+
+
+(define-judgment-form stlc-syntax
+  #:contract (⋖rec tRec tRec)
+  #:mode     (⋖rec I I)
+  
+  [(@rec tRec1 x t1)
+   (⋖ t1 t2)
+   (⋖rec tRec1 tRec2)
+   ------ t-sub-rec
+   (⋖rec tRec1 (field x t2 tRec2))]
+
+  [------ t-sub-rec-empty
+   (⋖rec ϵ ϵ)]
+
+  [(con (⋖rec tRec x_rec))
+   ------ t-sub-rec-premise
+   (⋖rec tRec x_rec)])
+
+
 ; required for any lang
 (define-judgment-form stlc-syntax
   #:contract (con premise)
   #:mode (con I)
-  [------ t-equal
+  [------ con-equal
    (con premise/equation)]
-  [------ t-judge
+  [------ con-subtype
+   (con premise/subtype)]
+  [------ con-judge
    (con premise/judgement)]
-  [------ t-assum
+  [------ con-assum
    (con (assumption any))])
 
 ; required for any lang
@@ -380,20 +459,20 @@
 
 ; required for any lang
 (define-judgment-form stlc-syntax
-  #:contract (rec@t tRec x t)
-  #:mode (rec@t I I O)
+  #:contract (@rec tRec x t)
+  #:mode (@rec I I O)
 
   [------ t-rec-at-base
-   (rec@t (field x t tRec) x t)]
+   (@rec (field x t tRec) x t)]
 
-  [(rec@t tRec x t)
+  [(@rec tRec x t)
    ------ t-rec-at-recur
-   (rec@t (field x_2 t_2 tRec) x t)]
+   (@rec (field x_2 t_2 tRec) x t)]
 
   [(where x_t ,(fresh-type-var))
    (con (assumption (x_rec @ x = x_t)))
    ------ t-rec-at-premise
-   (rec@t x_rec x x_t)])
+   (@rec x_rec x x_t)])
 
 
 ; required for any lang

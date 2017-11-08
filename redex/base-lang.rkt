@@ -25,12 +25,17 @@
   (premise ::=
      premise/judgement
      premise/equation
+     premise/subtype
      (assumption any))
   (premise/judgement ::=  (Γ ⊢ s : t))
   (premise/equation ::=
                     (t = t)
                     (t* = t*)
-                    (tRec = tRec)))
+                    (tRec = tRec))
+  (premise/subtype ::=
+                   (t ⋖ t)
+                   (t* ⋖ t*)
+                   (tRec ⋖ tRec)))
 
 (caching-enabled? #f)
 
