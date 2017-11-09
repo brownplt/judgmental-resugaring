@@ -108,7 +108,7 @@
 ;; Haskell List Comprehensions ;;
 
 (define-global 'concatMap
-  (term ((i -> (List o)) (List i) -> (List o))))
+  (term (((i -> (List o)) -> (List i)) -> (List o))))
 
 ; [e | b, Q] = if b then [e | Q] else []
 (define rule_hlc-guard
@@ -124,7 +124,8 @@
   (rule "hlc-bind" #:capture()
         (hlc ~e (hlc/bind x ~l ~Q)) ; [e | x <- l, Q]
         (calctype ~l as (List t) in ; concatMap (\x. [e | Q]) l
-                  (apply concatMap (λ ((x : t)) (hlc ~e ~Q)) ~l))))
+                  (apply concatMap
+                         (cons (λ ((x : t)) (hlc ~e ~Q)) (cons ~l ϵ))))))
  
 ; [e | let decls, Q] = let decls in [e | Q]
 ; TODO: this is singleton let
@@ -173,6 +174,35 @@
         (myapp ~fun ~arg)
         (~fun ~arg)))
 
+; exists
+
+
+#;(define rule_newtype
+  (rule "newtype" #:capture()
+        (let-new-type w of t as X in ~body)
+        (let-new-type w of T as X in t
+         ⇒ unpack (∃X, w) = pack (T, (id, id)) as (∃X, (T -> X, X -> T)) in t)))
+
+
+; classes
+(define rule_c-new
+  (rule "new" #:capture()
+        (new C ~args)
+        (apply (dot C construct) ~args)))
+
+
+#;((     (class x extends x class-body rest)
+     (call s x s*)
+     (new x s*)
+     (cast x s))
+  (class-body ::= { class-fields & class-constructor & class-methods })
+  (class-fields ::= sRec)
+  (class-constructor ::= (constructor ((x : t) ...) {
+                           (super x ...)
+                           ((x = x) ...)
+                         }))
+  (class-methods ::= (method ((x : t) ...) -> t { t })))
+
 
 
 
@@ -189,10 +219,11 @@
 
 (show-derivations
  (map simply-resugar
+      #;(list rule_c-new)
       #;(list rule_myapp)
       #;(list rule_rec-point rule_rec-sum)
       #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
-      #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
+      (list rule_hlc-bind rule_hlc-guard rule_hlc-let)
       #;(list
        rule_method
        rule_hlc-bind rule_hlc-guard rule_hlc-let
