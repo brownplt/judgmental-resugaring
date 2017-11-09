@@ -108,8 +108,8 @@
 (define (get-global x)
   (hash-ref language-globals x))
 
-(define (define-global x type)
-  (hash-set! language-globals x type))
+(define-syntax-rule (define-global x type)
+  (hash-set! language-globals 'x (term type)))
 
 
 ;; ------------------------------------------------------------

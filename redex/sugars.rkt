@@ -107,8 +107,8 @@
 
 ;; Haskell List Comprehensions ;;
 
-(define-global 'concatMap
-  (term ((i -> (List o)) (List i) -> (List o))))
+(define-global concatMap
+  ((i -> (List o)) (List i) -> (List o)))
 
 ; [e | b, Q] = if b then [e | Q] else []
 (define rule_hlc-guard
@@ -174,14 +174,21 @@
         (~fun ~arg)))
 
 ; exists
+(define-global id (a -> a))
 
-
-#;(define rule_newtype
+#;(define rule_newtype ; newtype as a pair
   (rule "newtype" #:capture()
-        (let-new-type w of t as X in ~body)
-        (let-new-type w of T as X in t
-         ⇒ unpack (∃X, w) = pack (T, (id, id)) as (∃X, (T -> X, X -> T)) in t)))
+        (let-new-type w of T as X in ~body)
+        (let (∃ X w) = (∃ T (pair id id) as
+          (∃ X (Pair (T -> X) (X -> T)))) in
+          ~body)))
 
+(define rule_newtype ; newtype as a record
+  (rule "newtype" #:capture()
+        (let-new-type w of T as X in ~body)
+        (let (∃ X w) = (∃ T (record (field wrap id (field unwrap id ϵ))) as
+          (∃ X (Record (field wrap (T -> X) (field unwrap (X -> T) ϵ))))) in
+          ~body)))
 
 ; classes
 (define rule_c-new
@@ -218,11 +225,12 @@
 
 (show-derivations
  (map simply-resugar
+      (list rule_newtype)
       #;(list rule_c-new)
       #;(list rule_myapp)
       #;(list rule_rec-point rule_rec-sum)
       #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
-      (list rule_hlc-bind rule_hlc-guard rule_hlc-let)
+      #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
       #;(list
        rule_method
        rule_hlc-bind rule_hlc-guard rule_hlc-let
