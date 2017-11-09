@@ -304,12 +304,7 @@
 
 #;(define (resugar-premise unif premise)
   (let [[premise (substitute unif premise)]]
-    (let [[derivs
-           (match premise
-             [(list '⋖ a b)
-              (printf "RESUGARING PREMISE")
-              (build-derivations (⋖ ,a ,b))]
-             [_ (list)])]]
+    (let [[derivs (dynamic-build-derivations premise)]]
       (match (length derivs)
         [0 (list premise)]
         [1 (get-premises (first derivs))]
@@ -484,6 +479,13 @@
   (if (hash-has-key? hash key)
       (hash-ref hash key)
       #f))
+
+(define-syntax (dynamic-build-derivations stx)
+  (syntax-case stx ()
+    [(dynamic-build-derivations x)
+     (with-syntax [[a (eval-syntax #'x)]]
+       #'(build-derivations a))]))
+
 
 
 ;; ------------------------------------------------------------
