@@ -30,17 +30,17 @@
 (define rule_let
   (rule "let" #:capture()
         (let x = ~a in ~b)
-        (calctype ~a as t in (apply (λ ((x : t)) ~b) ~a))))
+        (calctype ~a as t in ((λ ((x : t)) ~b) ~a))))
 
 (define rule_or
   (rule "or" #:capture()
         (or ~a ~b)
-        (apply (λ ((x : Bool)) (if x x ~b)) ~a)))
+        ((λ ((x : Bool)) (if x x ~b)) ~a)))
 
 (define rule_seq
   (rule "seq" #:capture()
         (seq ~a ~b)
-        (apply (λ ((x : Unit)) ~b) ~a)))
+        ((λ ((x : Unit)) ~b) ~a)))
 
 (define rule_sametype
   (rule "sametype" #:capture()
@@ -108,7 +108,7 @@
 ;; Haskell List Comprehensions ;;
 
 (define-global 'concatMap
-  (term (((i -> (List o)) -> (List i)) -> (List o))))
+  (term ((i -> (List o)) (List i) -> (List o))))
 
 ; [e | b, Q] = if b then [e | Q] else []
 (define rule_hlc-guard
@@ -124,8 +124,7 @@
   (rule "hlc-bind" #:capture()
         (hlc ~e (hlc/bind x ~l ~Q)) ; [e | x <- l, Q]
         (calctype ~l as (List t) in ; concatMap (\x. [e | Q]) l
-                  (apply concatMap
-                         (cons (λ ((x : t)) (hlc ~e ~Q)) (cons ~l ϵ))))))
+                  (concatMap (λ ((x : t)) (hlc ~e ~Q)) ~l))))
  
 ; [e | let decls, Q] = let decls in [e | Q]
 ; TODO: this is singleton let
@@ -188,7 +187,7 @@
 (define rule_c-new
   (rule "new" #:capture()
         (new C ~args)
-        (apply (dot C construct) ~args)))
+        ((dot C construct) ~args)))
 
 
 #;((     (class x extends x class-body rest)

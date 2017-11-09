@@ -47,7 +47,7 @@
      (iszero e)
      (+ e e) ; added for convenience
      ; stlc
-     (apply e ...)
+     (e e ...)
      (λ ((x : t) ...) e)
      ; ascription
      (e as t)
@@ -75,8 +75,12 @@
      (isnil e)
      (head e)
      (tail e)
+     ; exists
+     (∃ t e as t)
+     (let (∃ x x) = e in e)
      ; builtin
      (calctype e as t in e))
+  (param* ::= ϵ a (cons (x : t) param*))
   (x ::= variable-not-otherwise-mentioned)
   (v ::=
      ; booleans
@@ -84,15 +88,19 @@
      false
      ; numbers
      n
+     ; stlc
+     (λ ((x : t) ...) e)
      ; pair
      (pair v v)
      ; tuple
      (tuple v*)
      ; record
-     ;(record (x v) ...)
+     (record vRec)
      ; list
      nil
-     (cons v v))
+     (cons v v)
+     ; exists
+     (∃ t v as t))
   (v* ::= ϵ (cons v v*)) ; for all langs
   (n ::=
      number
@@ -117,7 +125,9 @@
      ; list
      (List t)
      ; subtyping
-     Top)
+     Top
+     ; exists
+     (∃ x t))
   (s ::= ....
      (hlc s s)
      (ands s*)
@@ -209,23 +219,42 @@
   #;[(⊢ Γ e_fun t_fun)
    (⊢ Γ e_arg t_arg)
    (where x_t ,(fresh-type-var))
-   #;(where x_arg ,(fresh-type-var)) ; subtyping
-   (con (t_fun = (t_arg -> x_t))) ; subtyping (x_arg vs. t_arg)
-   #;(⋖ t_arg x_arg) ; subtyping
+   (where x_arg ,(fresh-type-var)) ; subtyping
+   (con (t_fun = (x_arg -> x_t))) ; subtyping (x_arg vs. t_arg)
+   (⋖ t_arg x_arg) ; subtyping
    ------ t-apply
    (⊢ Γ (e_fun e_arg) x_t)]
 
   ; multi-arity functions
   [(⊢ (append Γ [(x : t) ...]) e t_e)
-   ------ t-lambda*
+   ------ t-lambda
    (⊢ Γ (λ ((x : t) ...) e) (t ... -> t_e))]
 
   [(⊢ Γ e_fun t_fun)
-   (⊢ Γ e_arg t_arg) ...
    (where x_ret ,(fresh-type-var))
-   (con (t_fun = (t_arg ... -> x_ret)))
-   ------ t-apply*
-   (⊢ Γ (apply e_fun e_arg ...) x_ret)]
+   (⊢ Γ e_args t_args) ...
+   (con (t_fun = (t_args ... -> x_ret)))
+   ------ t-apply
+   (⊢ Γ (e_fun e_args ...) x_ret)]
+
+  ; multi-arity functions w/ *
+  #;[(⊢ Γ e t_ret)
+   ------ t-lambda-empty
+   (⊢ Γ (λ* ϵ e) (ϵ ->* t_ret))]
+
+  #;[(⊢ (extend Γ x t) (λ param* e) t_fun)
+   (where x_ret ,(fresh-type-var))
+   (where x_params ,(fresh-type-var))
+   (con (t_fun = (x_params ->* x_ret)))
+   ------ t-lambda-cons
+   (⊢ Γ (λ (cons (x : t) param*) e) ((cons t x_params) ->* x_ret))]
+  
+  #;[(⊢ Γ e_fun t_fun)
+   (⊢* Γ e*_args t*_args)
+   (where x_ret ,(fresh-type-var))
+   (con (t_fun = (t*_args -> x_ret)))
+   ------ t-apply
+   (⊢ Γ (apply e_fun e*_args) x_ret)]
 
   ; unit
   [------ t-unit
@@ -352,6 +381,19 @@
    (@rec x_rec x t)
    ------ t-dot
    (⊢ Γ (dot e x) t)]
+
+  ; exists
+  [(⊢ Γ e t_e)
+   (con (t_e = (substitute t_2 x t)))
+   ------ t-pack
+   (⊢ Γ (∃ t e as (∃ x t_2)) (∃ x t_2))]
+
+  [(⊢ Γ e_def t_def)
+   (where x_ex ,(fresh-type-var))
+   (con (t_def = (∃ x_t x_ex)))
+   (⊢ (extend Γ x x_ex) e_body t_body)
+   ------ t-unpack
+   (⊢ Γ (let (∃ x_t x) = e_def in e_body) t_body)]
 
   ; required for any lang
   [(where x_t ,(atom->type-var (term s))) ; TODO: safety checks!
