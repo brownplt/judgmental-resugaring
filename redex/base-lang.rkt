@@ -19,7 +19,7 @@
   (t  ::= x)
   (t* ::= ϵ x (cons t t*))
   (tRec ::= ϵ x (field x t tRec))
-  (Γ ::= [(x : t) ...])
+  (Γ ::= ϵ x (bind x t Γ))
   (a ::= (variable-prefix ~))
   (x ::= variable-not-otherwise-mentioned)
   (premise ::=
@@ -31,6 +31,7 @@
   (premise/equation ::=
                     (t = t)
                     (t* = t*)
+                    (Γ = Γ)
                     (tRec = tRec))
   (premise/subtype ::=
                    (t ⋖ t)
@@ -38,6 +39,14 @@
                    (tRec ⋖ tRec)))
 
 (caching-enabled? #f)
+
+(define debug-enabled? #t)
+
+(define-syntax-rule
+  (debug arg ...)
+  (if debug-enabled?
+      (printf arg ...)
+      (void)))
 
 ; NOTE:
 ; type inference is necessary because:

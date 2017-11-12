@@ -144,26 +144,35 @@
   (class-methods ::= (method ((x : t) ...) -> t { t })))
 
 (define-metafunction stlc-syntax
-  lookup : x Γ -> t
-  [(lookup x [(x_1s : t_1s) ... (x : t) (x_2s : t_2s) ...])
-   t
-   (side-condition (not (member (term x) (term (x_2s ...)))))]
+  lookup : x Γ -> any ; (t or #f)
   [(lookup x Γ)
    ,(get-global (term x))
-   (side-condition (global-exists? (term x)))])
+   (side-condition (global-exists? (term x)))]
+  [(lookup x Γ)
+   t
+   (where t (lookup-recur x Γ))]
+  [(lookup x Γ)
+   #f
+   (where #f (lookup-recur x Γ))])
+
 
 (define-metafunction stlc-syntax
-  extend : Γ x t -> Γ
-  [(extend [(x_s : t_s) ...] x t)
-   [(x_s : t_s) ... (x : t)]])
+  lookup-recur : x Γ -> any ; (t or #f)
+  [(lookup-recur x (bind x t Γ)) t]
+  [(lookup-recur x (bind x_2 t Γ))
+   (lookup-recur x Γ)
+   (side-condition (not (equal? (term x) (term x_2))))]
+  [(lookup-recur x Γ)
+   #f])
 
 (define-metafunction stlc-syntax
   append : Γ Γ -> Γ
-  [(append [(x_1 : t_1) ...] [(x_2 : t_2) ...])
-   [(x_1 : t_1) ... (x_2 : t_2) ...]])
+  [(append (bind x t Γ_1) Γ_2)
+   (bind x t (append Γ_1 Γ_2))]
+  [(append ϵ Γ)
+   Γ])
 
 
-;(define-extended-judgment-form stlc-syntax =>base
 (define-judgment-form stlc-syntax
   #:contract (⊢ Γ e t)
   #:mode (⊢ I I O)
@@ -207,30 +216,38 @@
    (⊢ Γ (+ e_1 e_2) Nat)]
 
   ; stlc
-  [(side-condition ,(not (string-prefix? (symbol->string (term x)) "~"))) ; exclude atoms
+  [(side-condition ,(not (pattern-variable? (term x))))
    (where t (lookup x Γ))
    ------ t-id
    (⊢ Γ x t)]
+
+  [(side-condition ,(not (pattern-variable? (term x))))
+   (where #f (lookup x Γ))
+   (where x_Γ ,(fresh-type-var-named 'Γ))
+   (where x_t ,(fresh-type-var))
+   (con (Γ = (bind x x_t x_Γ)))
+   ------ t-id-bind
+   (⊢ Γ x x_t)]
   
-  #;[(⊢ (extend Γ x t_1) e t_2)
+  [(⊢ (bind x t_1 Γ) e t_2)
    ------ t-lambda
    (⊢ Γ (λ (x : t_1) e) (t_1 -> t_2))]
 
-  #;[(⊢ Γ e_fun t_fun)
+  [(⊢ Γ e_fun t_fun)
    (⊢ Γ e_arg t_arg)
    (where x_t ,(fresh-type-var))
-   (where x_arg ,(fresh-type-var)) ; subtyping
-   (con (t_fun = (x_arg -> x_t))) ; subtyping (x_arg vs. t_arg)
-   (⋖ t_arg x_arg) ; subtyping
+   #;(where x_arg ,(fresh-type-var)) ; subtyping
+   (con (t_fun = (t_arg -> x_t))) ; subtyping (x_arg vs. t_arg)
+   #;(⋖ t_arg x_arg) ; subtyping
    ------ t-apply
    (⊢ Γ (e_fun e_arg) x_t)]
 
   ; multi-arity functions
-  [(⊢ (append Γ [(x : t) ...]) e t_e)
+  #;[(⊢ (append Γ [(x : t) ...]) e t_e)
    ------ t-lambda
    (⊢ Γ (λ ((x : t) ...) e) (t ... -> t_e))]
 
-  [(⊢ Γ e_fun t_fun)
+  #;[(⊢ Γ e_fun t_fun)
    (where x_ret ,(fresh-type-var))
    (⊢ Γ e_args t_args) ...
    (con (t_fun = (t_args ... -> x_ret)))
@@ -242,7 +259,7 @@
    ------ t-lambda-empty
    (⊢ Γ (λ* ϵ e) (ϵ ->* t_ret))]
 
-  #;[(⊢ (extend Γ x t) (λ param* e) t_fun)
+  #;[(⊢ (bind x t Γ) (λ param* e) t_fun)
    (where x_ret ,(fresh-type-var))
    (where x_params ,(fresh-type-var))
    (con (t_fun = (x_params ->* x_ret)))
@@ -268,7 +285,7 @@
 
   ; let
   [(⊢ Γ e_1 t_1)
-   (⊢ (extend Γ x t_1) e_2 t_2)
+   (⊢ (bind x t_1 Γ) e_2 t_2)
    ------ t-let
    (⊢ Γ (let! x = e_1 in e_2) t_2)]
 
@@ -322,8 +339,8 @@
    (where x_t2 ,(fresh-type-var))
    (⊢ Γ e t)
    (con (t = (Sum x_t1 x_t2)))
-   (⊢ (extend Γ x_1 x_t1) e_1 t_1)
-   (⊢ (extend Γ x_2 x_t2) e_2 t_2)
+   (⊢ (bind x_1 x_t1 Γ) e_1 t_1)
+   (⊢ (bind x_2 x_t2 Γ) e_2 t_2)
    (con (t_1 = t_2))
    ------ t-case
    (⊢ Γ (case e of (inl x_1 => e_1) (inr x_2 => e_2)) t_1)]
@@ -335,8 +352,8 @@
    ------ t-fix
    (⊢ Γ (fix e) x_t)]
 
-  [(⊢ (extend Γ x t) e_1 t_1)
-   (⊢ (extend Γ x t) e_2 t_2)
+  [(⊢ (bind x t Γ) e_1 t_1)
+   (⊢ (bind x t Γ) e_2 t_2)
    (con (t_1 = t))
    ------ t-letrec
    (⊢ Γ (letrec! x : t = e_1 in e_2) t_2)]
@@ -391,7 +408,7 @@
   [(⊢ Γ e_def t_def)
    (where x_ex ,(fresh-type-var))
    (con (t_def = (∃ x_t x_ex)))
-   (⊢ (extend Γ x x_ex) e_body t_body)
+   (⊢ (bind x x_ex Γ) e_body t_body)
    ------ t-unpack
    (⊢ Γ (let (∃ x_t x) = e_def in e_body) t_body)]
 
@@ -511,7 +528,13 @@
    ------ t-rec-at-recur
    (@rec (field x_2 t_2 tRec) x t)]
 
-  [(where x_t ,(fresh-type-var))
+  [(where x_val ,(fresh-type-var))
+   (where x_rest ,(fresh-type-var))
+   (con (x_rec = (field x x_val x_rest)))
+   ------ t-rec-at-row
+   (@rec x_rec x x_val)]
+
+  #;[(where x_t ,(fresh-type-var))
    (con (assumption (x_rec @ x = x_t)))
    ------ t-rec-at-premise
    (@rec x_rec x x_t)])

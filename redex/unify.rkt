@@ -5,18 +5,21 @@
 
 (provide
  ; resugaring
- resugar-rule
+ (rename-out (resugar-rule resugar))
  (struct-out Resugared)
  ; desugaring rules
  (rename-out (make-rule rule))
  ; freshness
  fresh-type-var
+ fresh-type-var-named
  atom->type-var
  unfreshen
  ; globals
  define-global
  global-exists?
- get-global)
+ get-global
+ ; misc
+ pattern-variable?)
 
 ;; assumption: Redex model does not contain #f
 
@@ -25,11 +28,14 @@
 
 (define fresh-vars (make-parameter #f))
 
-(define (fresh-binding? binding)
-  (member (car binding) (fresh-vars)))
-
 (define (unfreshen Γ)
-  (filter (λ (b) (not (fresh-binding? b))) Γ))
+  (match Γ
+    ['ϵ 'ϵ]
+    [(? variable?) Γ]
+    [(list 'bind x t Γ)
+     (if (member x (fresh-vars))
+         Γ
+         (list 'bind x t Γ))]))
 
 (define-struct DsRule (name fresh lhs rhs))
 
@@ -55,14 +61,34 @@
     (set! the-char (+ the-char 1))
     ch))
 
-(define (reset-char!)
-  (set! the-char (char->integer #\A)))
+(define the-names (make-hash))
+
+(define (next-name-index name)
+  (if (hash-has-key? the-names name)
+      (let [[i (hash-ref the-names name)]]
+        (hash-set! the-names name (+ i 1))
+        i)
+      (begin
+        (hash-set! the-names name 2)
+        1)))
+
+(define (next-name name)
+  (let [[i (next-name-index name)]]
+    (string->symbol (string-append (symbol->string name)
+                                   (number->string i)))))
+
+(define (reset-names!)
+  (set! the-char (char->integer #\A))
+  (set! the-names (make-hash)))
+
+(define (fresh-type-var-named name)
+  (next-name name))
 
 (define (fresh-type-var)
   (string->symbol (make-string 1 (next-char))))
 
 (define (atom->type-var atom)
-  (fresh-type-var))
+  (fresh-type-var-named atom))
 
 
 ;; ------------------------------------------------------------
@@ -70,7 +96,10 @@
 
 (define language-literals (make-parameter (set)))
 
-(define meta-literals (set 'cons 'field 'ϵ))
+(define meta-literals (set 'cons 'field 'bind 'ϵ))
+
+(define (pattern-variable? x)
+  (string-prefix? (symbol->string x) "~"))
 
 (define (variable? x)
   (and (symbol? x)
@@ -90,6 +119,8 @@
     [(list 'cons expr exprs)
      (set-union (get-variables expr) (get-variables exprs))]
     [(list 'field x expr exprs)
+     (set-union (get-variables expr) (get-variables exprs))]
+    [(list 'bind x expr exprs)
      (set-union (get-variables expr) (get-variables exprs))]
     [(? list?)
      (foldl set-union (set) (map get-variables t))]
@@ -222,6 +253,8 @@
      (list 'cons (recur expr) (recur exprs))]
     [(list 'field x expr exprs)
      (list 'field x (recur expr) (recur exprs))]
+    [(list 'bind x expr exprs)
+     (list 'bind x (recur expr) (recur exprs))]
     [(? list? expr)
      (map recur expr)]
     [(? Unification? expr)
@@ -247,6 +280,8 @@
      (list 'cons (recur t) (recur ts))]
     [(list 'field x t ts)
      (list 'field x (recur t) (recur ts))]
+    [(list 'bind x t ts)
+     (list 'bind x (recur t) (recur ts))]
     [(list x '⋖ y)
      (list (substitute unif x) '⋖ (substitute unif y))]
     [(? list? t)
@@ -265,6 +300,7 @@
     ['ϵ                   #f]
     [(list 'cons t ts)    (or (recur t) (recur ts))]
     [(list 'field _ t ts) (or (recur t) (recur ts))]
+    [(list 'bind _ t ts)  (or (recur t) (recur ts))]
     [(? list? t)          (ormap recur t)]
     [else                 (error 'occurs? "fell off match")]))
 
@@ -300,6 +336,7 @@
               (append premises assumptions))))
 
 (define (found-derivation! deriv)
+  #;(show-derivations (list deriv))
   (printf "Derivation found!\n~a\n" deriv))
 
 #;(define (resugar-premise unif premise)
@@ -322,8 +359,8 @@
 (define-syntax-rule (resugar-rule rule ty literals globals)
   (parameterize ([fresh-vars (DsRule-fresh rule)]
                  [language-literals literals])
-    (reset-char!)
-    (let [[derivations (build-derivations (ty [] ,(DsRule-rhs rule) _))]]
+    (reset-names!)
+    (let [[derivations (build-derivations (ty Γ ,(DsRule-rhs rule) _))]]
       (when (not (eq? 1 (length derivations)))
         (resugar-error rule derivations))
       (let [[deriv (first derivations)]]
@@ -360,32 +397,34 @@
   (equate Γ1 Γ2 unif))
 
 (define (equate x y unif)
-    
-  (define (take-field fld rec)
+  (printf "~a = ~a\n" x y)
+  (define (take-field x rec) ; overloaded for 'bind
     (match rec
       ['ϵ (values #f rec)]
       [(? variable? _) (values #f rec)]
-      [(list 'field x val rest)
-       (if (equal? fld x)
+      [(list (or 'field 'bind) y val rest)
+       (if (equal? x y)
            (values val rest)
-           (let-values [[[val* rec*] (take-field fld rest)]]
+           (let-values [[[val* rec*] (take-field x rest)]]
              (if val*
-                 (values val* (list 'field x val rec*))
+                 (values val* (list (car rec) y val rec*))
                  (values #f rec))))]))
   
-  (define (equate-fields rec1 rec2 unif)
+  (define (equate-fields name rec1 rec2 unif) ; overloaded for 'bind
+    (printf "~a =r ~a\n" rec1 rec2)
     (define (recur rec1 rec2 um1 um2 unif)
+      (printf "  ~a =u ~a & ~a & ~a\n" rec1 rec2 um1 um2)
       (match* [rec1 rec2]
-        [[(list 'field x val1 rec1) _]
+        [[(list (or 'field 'bind) x val1 rec1*) _]
          (let-values [[[val2 rec2] (take-field x rec2)]]
            (if val2
-               (equate val1 val2 (recur rec1 rec2 um1 um2 unif))
-               (recur rec1 rec2 (list 'field x val1 um1) um2 unif)))]
-      [[_ (list 'field y val2 rec2)]
-       (recur rec1 rec2 um1 (list 'field y val2 um2) unif)]
+               (equate val1 val2 (recur rec1* rec2 um1 um2 unif))
+               (recur rec1* rec2 (list (car rec1) x val1 um1) um2 unif)))]
+      [[_ (list (or 'field 'bind) y val2 rec2*)]
+       (recur rec1 rec2* um1 (list (car rec2) y val2 um2) unif)]
       [[(or 'ϵ (? variable?)) (or 'ϵ (? variable?))]
        (equate rec1 um2 (equate rec2 um1 unif))]))
-    (let [[t (fresh-type-var)]]
+    (let [[t (fresh-type-var-named name)]]
       (recur rec1 rec2 t t unif)))
 
   (match* [x y]
@@ -419,7 +458,11 @@
     ; records
     [[(list 'field _ _ _)
       (list 'field _ _ _)]
-     (equate-fields x y unif)]
+     (equate-fields 'ρ x y unif)]
+    ; environments
+    [[(list 'bind _ _ _)
+      (list 'bind _ _ _)]
+     (equate-fields 'Γ x y unif)]
     ; Compound expressions - TODO: not general
     [[(list-rest xs) (list-rest ys)]
      (when (not (equal? (length xs) (length ys)))
@@ -428,39 +471,6 @@
     ; Do not match
     [[_ _]
      (unification-error x y)]))
-
-; Take two sets of record fields as arguments, rec1 & rec2.
-; Try to 'match' them, findings fields of the same name.
-; Produce (matched field-values of rec1,
-;          matched field-values of rec2,
-;          unmatched fields of rec1,
-;          unmatched fields of rec2).
-(define (match-fields rec1 rec2)
-  
-  (define (take-first-field rec)
-    (values (caar rec) (cadar rec) (cdr rec)))
-  
-  (define (take-field fld rec)
-    (cond [(empty? rec)
-           (values #f rec)]
-          [(equal? (caar rec) fld)
-           (values (cadar rec) (cdr rec))]
-          [else
-           (let-values [[[val rec*] (take-field fld (cdr rec))]]
-             (if val
-                 (values val (cons (car rec) rec*))
-                 (values #f rec)))]))
-  
-  (define (recur rec1 rec2 m1 m2 um1)
-    (if (empty? rec1)
-        (values m1 m2 um1 rec2)
-        (let-values [[[fld val rec1] (take-first-field rec1)]]
-          (let-values [[[found rec2] (take-field fld rec2)]]
-            (if found
-                (recur rec1 rec2 (cons val m1) (cons found m2) um1)
-                (recur rec1 rec2 m1 m2 (cons (list fld val) um1)))))))
-
-  (recur rec1 rec2 empty empty empty))
 
 
 
@@ -507,13 +517,24 @@
   (check-expect (occurs? 'X 'X) true)
   (check-expect (occurs? 'X '(List X)) true)
 
+  (check-expect (get-variables '((cons (field x x (field y z r)) (q 3)) w))
+                (set 'x 'z 'r 'q 'w))
+
+  (check-expect (replace 'x '(field y 1 ϵ) '(field x y x))
+                '(field x y (field y 1 ϵ)))
+
+  (check-expect (occurs? 'x '(cons y (field c z w))) #f)
+  (check-expect (occurs? 'y '(cons y (field c z w))) #t)
+  (check-expect (occurs? 'z '(cons y (field c z w))) #t)
+  (check-expect (occurs? 'w '(cons y (field c z w))) #t)
+  
   (define unif4 (equate '(field a X (field b Y row1)) 'd
                         (equate 'd '(field c Z (field b W row2))
                                 (new-unification))))
   (check-expect (substitute unif4 '(d row1 row2))
-                '((field c Z (field b Y (field a X A)))
-                  (field c Z A)
-                  (field a X A)))
+                '((field c Z (field b Y (field a X ρ1)))
+                  (field c Z ρ1)
+                  (field a X ρ1)))
   
   (define unif5 (equate '(field a X (field b X ϵ))
                         '(field a Y row)

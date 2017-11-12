@@ -216,17 +216,17 @@
 ;; Resugaring
 
 ; TODO: derive automatically
-(define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Num 'Bool
+(define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Nat 'Bool
                           'true 'false 'Unit 'as 'case 'of 'inl 'inr '=>))
 
 (define (simply-resugar r)
-  (let ([resugared (resugar-rule r ⊢ the-literals the-globals)])
+  (let ([resugared (resugar r ⊢ the-literals the-globals)])
     (Resugared-rule resugared)))
 
 (show-derivations
  (map simply-resugar
-      (list rule_newtype)
-      #;(list rule_c-new)
+      (list rule_c-new)
+      #;(list rule_newtype)
       #;(list rule_myapp)
       #;(list rule_rec-point rule_rec-sum)
       #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
