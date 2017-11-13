@@ -17,17 +17,27 @@
 ;;   let        (TAPL pg.124) (called let_)
 ;;   pairs      (TAPL pg.126)
 ;;   tuples     (TAPL pg.128) (subsumes pairs)
-;;   records    (TAPL pg.129) -- TODO, subsumes tuples? Needs row types?
+;;   records    (TAPL pg.129)
 ;;   sums       (TAPL pg.132) (uniq typing on pg. 135 irrelevant w/ T.I.)
+;;   variants   (TAPL pg.136) -- TODO
 ;;   fix        (TAPL pg.144)
 ;;   lists      (TAPL pg.147)
 ;;   refs       (TAPL pg.166) -- TODO
-;;   errors     (TAPL pg.175) -- TODO (skipping the tiny pre-version)
+;;   errors     (TAPL pg.175) (skipping the tiny pre-version)
+;; End of Part II - stopping here
 ;;   subtyping  (TAPL pg.186) -- TODO
 ;;   subty-rec  (TAPL pg.197) -- TODO
 ;;   subty-bot  (TAPL pg.192) -- TODO
 ;;   subty-var  (TAPL pg.197) -- TODO
 ;;   alg-subty  pg. 211, 212, 217
+;;   featherweight-java (TAPL pg.259)
+;;   iso-recurs (TAPL pg.276) -- TODO
+;;   constraint (TAPL pg.322) -- skip
+;;   system F   (TAPL pg.343) -- TODO
+;;   existential(TAPL pg.366) -- TODO (mostly done)
+
+;; Potential Resugaring Examples:
+;;   encoding existentials (TAPL 24.3 pg.377)
 
 ;; TODO:
 ;;   - allow sugars to build on each other
@@ -75,6 +85,9 @@
      (isnil e)
      (head e)
      (tail e)
+     ; exception
+     (raise e)
+     (try e with e)
      ; exists
      (∃ t e as t)
      (let (∃ x x) = e in e)
@@ -88,6 +101,8 @@
      false
      ; numbers
      n
+     ; strings
+     string
      ; stlc
      (λ ((x : t) ...) e)
      ; pair
@@ -110,6 +125,8 @@
      Bool
      ; numbers
      Nat
+     ; strings
+     String
      ; unit
      Unit
      ; stlc
@@ -172,6 +189,13 @@
   [(append ϵ Γ)
    Γ])
 
+(define-metafunction stlc-syntax
+  bind-each : [(x t) ...] Γ -> Γ
+  [(bind-each [] Γ)
+   Γ]
+  [(bind-each [(x t) (x_s t_s) ...] Γ)
+   (bind x t (bind-each [(x_s t_s) ...] Γ))])
+
 
 (define-judgment-form stlc-syntax
   #:contract (⊢ Γ e t)
@@ -208,6 +232,10 @@
    ------ t-iszero
    (⊢ Γ (iszero e) Bool)]
 
+  ;numbers
+  [------ t-num
+   (⊢ Γ n Nat)]
+
   [(⊢ Γ e_1 t_1)
    (⊢ Γ e_2 t_2)
    (con (t_1 = Nat))
@@ -215,13 +243,18 @@
    ------ t-sum
    (⊢ Γ (+ e_1 e_2) Nat)]
 
+  ; strings
+
+  [------ t-str
+   (⊢ Γ string String)]
+
   ; stlc
-  [(side-condition ,(not (pattern-variable? (term x))))
+  [(side-condition ,(variable? (term x)))
    (where t (lookup x Γ))
    ------ t-id
    (⊢ Γ x t)]
 
-  [(side-condition ,(not (pattern-variable? (term x))))
+  [(side-condition ,(variable? (term x)))
    (where #f (lookup x Γ))
    (where x_Γ ,(fresh-type-var-named 'Γ))
    (where x_t ,(fresh-type-var))
@@ -229,11 +262,7 @@
    ------ t-id-bind
    (⊢ Γ x x_t)]
   
-  [(⊢ (bind x t_1 Γ) e t_2)
-   ------ t-lambda
-   (⊢ Γ (λ (x : t_1) e) (t_1 -> t_2))]
-
-  [(⊢ Γ e_fun t_fun)
+  #;[(⊢ Γ e_fun t_fun)
    (⊢ Γ e_arg t_arg)
    (where x_t ,(fresh-type-var))
    #;(where x_arg ,(fresh-type-var)) ; subtyping
@@ -243,13 +272,13 @@
    (⊢ Γ (e_fun e_arg) x_t)]
 
   ; multi-arity functions
-  #;[(⊢ (append Γ [(x : t) ...]) e t_e)
+  [(⊢ (bind-each [(x t) ...] Γ) e t_ret)
    ------ t-lambda
-   (⊢ Γ (λ ((x : t) ...) e) (t ... -> t_e))]
+   (⊢ Γ (λ [(x : t) ...] e) (t ... -> t_ret))]
 
-  #;[(⊢ Γ e_fun t_fun)
-   (where x_ret ,(fresh-type-var))
+  [(⊢ Γ e_fun t_fun)
    (⊢ Γ e_args t_args) ...
+   (where x_ret ,(fresh-type-var))
    (con (t_fun = (t_args ... -> x_ret)))
    ------ t-apply
    (⊢ Γ (e_fun e_args ...) x_ret)]
@@ -386,6 +415,20 @@
    (con (t = (List x_t)))
    ------ t-tail
    (⊢ Γ (tail e) t)]
+
+  ; exceptions
+
+  [(⊢ Γ e t)
+   (where x_ret ,(fresh-type-var))
+   (con (t = String))
+   ------ t-raise
+   (⊢ Γ (raise e) x_ret)]
+
+  [(⊢ Γ e t)
+   (⊢ Γ e_catch t_catch)
+   (con (t_catch = (String -> t)))
+   ------ t-try
+   (⊢ Γ (try e with e_catch) t)]
 
   ; record
   [(⊢rec Γ eRec tRec)

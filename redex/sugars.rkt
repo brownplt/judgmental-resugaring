@@ -168,10 +168,17 @@
               (+ (dot r x)
                  (dot r y)))))
 
-(define rule_myapp
-  (rule "myapp" #:capture()
-        (myapp ~fun ~arg)
-        (~fun ~arg)))
+; exceptions
+(define rule_while
+  (rule "while" #:capture(break)
+        (while ~cond ~body)
+        ((fix (λ [(loop : (Unit -> Unit))]
+                (λ [(_ : Unit)]
+                  (try (if ~cond
+                           (loop (let! break = (λ [(_ : Unit)] (raise "")) in ~body))
+                           unit)
+                       with (λ [(err : String)] unit)))))
+         unit)))
 
 ; exists
 (define-global id (a -> a))
@@ -217,20 +224,22 @@
 
 ; TODO: derive automatically
 (define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Nat 'Bool
+                          'try 'with 'unit 'fix 'if
                           'true 'false 'Unit 'as 'case 'of 'inl 'inr '=>))
 
 (define (simply-resugar r)
   (let ([resugared (resugar r ⊢ the-literals the-globals)])
-    (Resugared-rule resugared)))
+    (Resugared-derivation resugared)))
 
 (show-derivations
  (map simply-resugar
-      (list rule_c-new)
+      #;(list rule_while)
+      #;(list rule_c-new)
       #;(list rule_newtype)
       #;(list rule_myapp)
       #;(list rule_rec-point rule_rec-sum)
       #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
-      #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
+      (list rule_hlc-bind rule_hlc-guard rule_hlc-let)
       #;(list
        rule_method
        rule_hlc-bind rule_hlc-guard rule_hlc-let

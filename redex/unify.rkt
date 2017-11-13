@@ -19,7 +19,7 @@
  global-exists?
  get-global
  ; misc
- pattern-variable?)
+ (rename-out (regular-variable? variable?)))
 
 ;; assumption: Redex model does not contain #f
 
@@ -34,8 +34,8 @@
     [(? variable?) Γ]
     [(list 'bind x t Γ)
      (if (member x (fresh-vars))
-         Γ
-         (list 'bind x t Γ))]))
+         (unfreshen Γ)
+         (list 'bind x t (unfreshen Γ)))]))
 
 (define-struct DsRule (name fresh lhs rhs))
 
@@ -88,7 +88,7 @@
   (string->symbol (make-string 1 (next-char))))
 
 (define (atom->type-var atom)
-  (fresh-type-var-named atom))
+  (fresh-type-var))
 
 
 ;; ------------------------------------------------------------
@@ -100,6 +100,9 @@
 
 (define (pattern-variable? x)
   (string-prefix? (symbol->string x) "~"))
+
+(define (regular-variable? x)
+  (and (variable? x) (not (pattern-variable? x))))
 
 (define (variable? x)
   (and (symbol? x)
@@ -115,6 +118,7 @@
     [(? variable?) (set t)]
     [(? literal?)  (set)]
     [(? number?)   (set)]
+    [(? string?)   (set)]
     ['ϵ            (set)]
     [(list 'cons expr exprs)
      (set-union (get-variables expr) (get-variables exprs))]
@@ -123,8 +127,7 @@
     [(list 'bind x expr exprs)
      (set-union (get-variables expr) (get-variables exprs))]
     [(? list?)
-     (foldl set-union (set) (map get-variables t))]
-    [_ (error 'get-variables "fell off match ~a" t)]))
+     (foldl set-union (set) (map get-variables t))]))
 
 
 
@@ -315,10 +318,11 @@
   (error 'unify "Occurs check failure: `~a` occurs in `~a`" x t))
 
 (define (resugar-error rule derivations)
-  (error 'derive "Expected exactly one derivation, but found ~a derivations for ~a. In deriation rule: ~a"
+  (error 'derive "Expected exactly one derivation, but found ~a derivations for ~a. In deriation rule: ~a.\n\n~a"
          (length derivations)
          (DsRule-name rule)
-         (DsRule-rhs rule)))
+         (DsRule-rhs rule)
+         derivations))
 
 
 ;; ------------------------------------------------------------
