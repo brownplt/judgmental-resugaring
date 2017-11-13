@@ -190,12 +190,21 @@
           (∃ X (Pair (T -> X) (X -> T)))) in
           ~body)))
 
-(define rule_newtype ; newtype as a record
+#;(define rule_newtype ; newtype as a record
   (rule "newtype" #:capture()
         (let-new-type w of T as X in ~body)
         (let (∃ X w) = (∃ T (record (field wrap id (field unwrap id ϵ))) as
           (∃ X (Record (field wrap (T -> X) (field unwrap (X -> T) ϵ))))) in
           ~body)))
+
+(define rule_newtype ; newtype as bindings
+  (rule "newtype" #:capture()
+        (let-new-type (wrap unwrap) of T as X in ~body)
+        (let (∃ X w) = (∃ T (pair id id) as
+          (∃ X (Pair (T -> X) (X -> T)))) in
+          (let! wrap = (fst w) in
+            (let! unwrap = (snd w) in
+              ~body)))))
 
 ; classes
 (define rule_c-new
@@ -229,17 +238,17 @@
 
 (define (simply-resugar r)
   (let ([resugared (resugar r ⊢ the-literals the-globals)])
-    (Resugared-derivation resugared)))
+    (Resugared-rule resugared)))
 
 (show-derivations
  (map simply-resugar
       #;(list rule_while)
       #;(list rule_c-new)
-      #;(list rule_newtype)
+      (list rule_newtype)
       #;(list rule_myapp)
       #;(list rule_rec-point rule_rec-sum)
       #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
-      (list rule_hlc-bind rule_hlc-guard rule_hlc-let)
+      #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)
       #;(list
        rule_method
        rule_hlc-bind rule_hlc-guard rule_hlc-let

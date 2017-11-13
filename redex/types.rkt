@@ -6,6 +6,10 @@
 
 (provide (all-defined-out))
 
+;; TODO:
+;;   - allow sugars to build on each other
+;;   - use syntax 'pack' and 'unpack'
+;;   - reverse order of 'bind'
 
 ;; --------------------------------------------------------------------------------------------------- 
 ;; This file tests type resugaring for a language consisting of:
@@ -38,13 +42,6 @@
 
 ;; Potential Resugaring Examples:
 ;;   encoding existentials (TAPL 24.3 pg.377)
-
-;; TODO:
-;;   - allow sugars to build on each other
-;; Writing:
-;;   - type environment Γ
-;;   - globals
-;;   - recursive sugars
 
 (define-extended-language stlc-syntax base-syntax
   (e ::= ....
@@ -183,6 +180,16 @@
    #f])
 
 (define-metafunction stlc-syntax
+  fresh-var : -> x
+  [(fresh-var)
+   ,(fresh-type-var)])
+
+(define-metafunction stlc-syntax
+  fresh-var-named : x -> x
+  [(fresh-var-named x)
+   ,(fresh-type-var-named (term x))])
+
+(define-metafunction stlc-syntax
   append : Γ Γ -> Γ
   [(append (bind x t Γ_1) Γ_2)
    (bind x t (append Γ_1 Γ_2))]
@@ -256,16 +263,16 @@
 
   [(side-condition ,(variable? (term x)))
    (where #f (lookup x Γ))
-   (where x_Γ ,(fresh-type-var-named 'Γ))
-   (where x_t ,(fresh-type-var))
+   (where x_Γ (fresh-var-named 'Γ))
+   (where x_t (fresh-var))
    (con (Γ = (bind x x_t x_Γ)))
    ------ t-id-bind
    (⊢ Γ x x_t)]
   
   #;[(⊢ Γ e_fun t_fun)
    (⊢ Γ e_arg t_arg)
-   (where x_t ,(fresh-type-var))
-   #;(where x_arg ,(fresh-type-var)) ; subtyping
+   (where x_t (fresh-var))
+   #;(where x_arg (fresh-var)) ; subtyping
    (con (t_fun = (t_arg -> x_t))) ; subtyping (x_arg vs. t_arg)
    #;(⋖ t_arg x_arg) ; subtyping
    ------ t-apply
@@ -278,7 +285,7 @@
 
   [(⊢ Γ e_fun t_fun)
    (⊢ Γ e_args t_args) ...
-   (where x_ret ,(fresh-type-var))
+   (where x_ret (fresh-var))
    (con (t_fun = (t_args ... -> x_ret)))
    ------ t-apply
    (⊢ Γ (e_fun e_args ...) x_ret)]
@@ -289,15 +296,15 @@
    (⊢ Γ (λ* ϵ e) (ϵ ->* t_ret))]
 
   #;[(⊢ (bind x t Γ) (λ param* e) t_fun)
-   (where x_ret ,(fresh-type-var))
-   (where x_params ,(fresh-type-var))
+   (where x_ret (fresh-var))
+   (where x_params (fresh-var))
    (con (t_fun = (x_params ->* x_ret)))
    ------ t-lambda-cons
    (⊢ Γ (λ (cons (x : t) param*) e) ((cons t x_params) ->* x_ret))]
   
   #;[(⊢ Γ e_fun t_fun)
    (⊢* Γ e*_args t*_args)
-   (where x_ret ,(fresh-type-var))
+   (where x_ret (fresh-var))
    (con (t_fun = (t*_args -> x_ret)))
    ------ t-apply
    (⊢ Γ (apply e_fun e*_args) x_ret)]
@@ -325,15 +332,15 @@
    (⊢ Γ (pair e_1 e_2) (Pair t_1 t_2))]
 
   [(⊢ Γ e t)
-   (where x_t1 ,(fresh-type-var))
-   (where x_t2 ,(fresh-type-var))
+   (where x_t1 (fresh-var))
+   (where x_t2 (fresh-var))
    (con (t = (Pair x_t1 x_t2)))
    ------ t-fst
    (⊢ Γ (fst e) x_t1)]
 
   [(⊢ Γ e t)
-   (where x_t1 ,(fresh-type-var))
-   (where x_t2 ,(fresh-type-var))
+   (where x_t1 (fresh-var))
+   (where x_t2 (fresh-var))
    (con (t = (Pair x_t1 x_t2)))
    ------ t-snd
    (⊢ Γ (snd e) x_t2)]
@@ -344,7 +351,7 @@
    (⊢ Γ (tuple e*) (Tuple t*))]
 
   [(⊢ Γ e t_e)
-   (where x* ,(fresh-type-var))
+   (where x* (fresh-var))
    (con (t_e = (Tuple x*)))
    (@t x* n t)
    ------ t-proj
@@ -355,17 +362,17 @@
 
   ; sums
   [(⊢ Γ e t)
-   (where x_t ,(fresh-type-var))
+   (where x_t (fresh-var))
    ------ t-inl
    (⊢ Γ (inl e) (Sum t x_t))]
 
   [(⊢ Γ e t)
-   (where x_t ,(fresh-type-var))
+   (where x_t (fresh-var))
    ------ t-inr
    (⊢ Γ (inr e) (Sum x_t t))]
 
-  [(where x_t1 ,(fresh-type-var))
-   (where x_t2 ,(fresh-type-var))
+  [(where x_t1 (fresh-var))
+   (where x_t2 (fresh-var))
    (⊢ Γ e t)
    (con (t = (Sum x_t1 x_t2)))
    (⊢ (bind x_1 x_t1 Γ) e_1 t_1)
@@ -376,7 +383,7 @@
 
   ; fix
   [(⊢ Γ e t)
-   (where x_t ,(fresh-type-var))
+   (where x_t (fresh-var))
    (con (t = (x_t -> x_t)))
    ------ t-fix
    (⊢ Γ (fix e) x_t)]
@@ -388,7 +395,7 @@
    (⊢ Γ (letrec! x : t = e_1 in e_2) t_2)]
 
   ; list
-  [(where x_t ,(fresh-type-var))
+  [(where x_t (fresh-var))
    ------ t-nil
    (⊢ Γ nil x_t)]
 
@@ -399,19 +406,19 @@
    (⊢ Γ (cons e_1 e_2) t_2)]
 
   [(⊢ Γ e t)
-   (where x_t ,(fresh-type-var))
+   (where x_t (fresh-var))
    (con (t = (List x_t)))
    ------ t-isnil
    (⊢ Γ (isnil e) Bool)]
 
   [(⊢ Γ e t)
-   (where x_t ,(fresh-type-var))
+   (where x_t (fresh-var))
    (con (t = (List x_t)))
    ------ t-head
    (⊢ Γ (head e) x_t)]
 
   [(⊢ Γ e t)
-   (where x_t ,(fresh-type-var))
+   (where x_t (fresh-var))
    (con (t = (List x_t)))
    ------ t-tail
    (⊢ Γ (tail e) t)]
@@ -419,7 +426,7 @@
   ; exceptions
 
   [(⊢ Γ e t)
-   (where x_ret ,(fresh-type-var))
+   (where x_ret (fresh-var))
    (con (t = String))
    ------ t-raise
    (⊢ Γ (raise e) x_ret)]
@@ -436,7 +443,7 @@
    (⊢ Γ (record eRec) (Record tRec))]
 
   [(⊢ Γ e t_e)
-   (where x_rec ,(fresh-type-var))
+   (where x_rec (fresh-var))
    (con (t_e = (Record x_rec)))
    (@rec x_rec x t)
    ------ t-dot
@@ -449,7 +456,7 @@
    (⊢ Γ (∃ t e as (∃ x t_2)) (∃ x t_2))]
 
   [(⊢ Γ e_def t_def)
-   (where x_ex ,(fresh-type-var))
+   (where x_ex (fresh-var))
    (con (t_def = (∃ x_t x_ex)))
    (⊢ (bind x x_ex Γ) e_body t_body)
    ------ t-unpack
@@ -571,13 +578,13 @@
    ------ t-rec-at-recur
    (@rec (field x_2 t_2 tRec) x t)]
 
-  [(where x_val ,(fresh-type-var))
-   (where x_rest ,(fresh-type-var))
+  [(where x_val (fresh-var))
+   (where x_rest (fresh-var))
    (con (x_rec = (field x x_val x_rest)))
    ------ t-rec-at-row
    (@rec x_rec x x_val)]
 
-  #;[(where x_t ,(fresh-type-var))
+  #;[(where x_t (fresh-var))
    (con (assumption (x_rec @ x = x_t)))
    ------ t-rec-at-premise
    (@rec x_rec x x_t)])
@@ -597,7 +604,7 @@
    ------ t-at-succ
    (@t (cons t t*) n t_n)]
 
-  [(where y ,(fresh-type-var))
+  [(where y (fresh-var))
    (con (assumption (x @ n$ = y)))
    ------ t-at-premise
    (@t x n$ y)])
