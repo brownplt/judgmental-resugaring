@@ -169,16 +169,18 @@
                  (dot r y)))))
 
 ; exceptions
-(define rule_while
+(define rule_foreach
   (rule "while" #:capture(break)
-        (while ~cond ~body)
-        ((fix (λ [(loop : (Unit -> Unit))]
-                (λ [(_ : Unit)]
-                  (try (if ~cond
-                           (loop (let! break = (λ [(_ : Unit)] (raise "")) in ~body))
-                           unit)
-                       with (λ [(err : String)] unit)))))
-         unit)))
+     (foreach x ~list ~body)
+     (letrec! loop : ((List a) (List b) -> (List b)) =
+       (λ [(lst : (List a)) (ans : (List b))]
+         (if (isnil lst)
+             ans
+             (try (let! break = (λ [(_ : Unit)] (raise "")) in
+                    (let! x = (head lst) in
+                      (loop (tail lst) (link ~body ans))))
+              with (λ [(_ : String)] ans)))) in
+       (loop ~list nil))))
 
 ; exists
 (define-global id (a -> a))
@@ -205,6 +207,54 @@
           (let! wrap = (fst w) in
             (let! unwrap = (snd w) in
               ~body)))))
+
+; error chaining
+(define rule_fail
+  (rule "fail" #:capture()
+        (fail)
+        (raise "%fail")))
+
+(define rule_and-then
+  (rule "and-then" #:capture()
+        (and-then ~a ~b)
+        (begin ~a ~b)))
+
+(define rule_or-else
+  (rule "or-else" #:capture()
+        (or-else ~a ~b)
+        (try ~a with (λ [(err : String)] ~b))))
+
+; cps (https://xavierleroy.org/publi/cps-dargaye-leroy.pdf)
+(define rule_cps-var
+  (rule "cps-var" #:capture()
+        (cps x)
+        (calctype x as t in (λ [(k : (t -> Unit))] (k x)))))
+
+(define rule_cps-lambda
+  (rule "cps-lambda" #:capture()
+        (cps (λ [(x : t)] ~M))
+        (calctype (λ [(x : t)] ~M) as (t -> t2) in
+          (λ [(k : ((t -> t2) -> Unit))]
+            (k (λ [(x : t)] ((cps ~M) (λ (y : t2) ?))))))))
+
+#;(define rule_cps-lambda
+  (rule "cps-lambda" #:capture()
+        (cps (λ [(x : t)] ~M))
+        (calctype (λ [(x : t)] ~M) as (t -> t2) in
+          (λ [(k : ((t -> ((t2 -> Unit) -> Unit)) -> Unit))]
+            (k (λ [(x : t)] (cps ~M)))))))
+
+(define rule_cps-apply
+  (rule "cps-apply" #:capture()
+        (cps (~M ~N))
+        (calctype ~M as (t1 -> t2) in
+          (λ [(k : (t2 -> Unit))]
+            ((cps ~M) (λ [(m : (t1 -> ((t2 -> Unit) -> Unit)))]
+                        ((cps ~N) (λ [(n : t1)] ((m n) k)))))))))
+
+;[[x]] = λk. k x
+;[[λx.M]] = λk. k (λx. [[M]])
+;[[M N]] = λk. [[M]] (λm. [[N]] (λn. m n k))
 
 ; classes
 (define rule_c-new
@@ -233,7 +283,7 @@
 
 ; TODO: derive automatically
 (define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Nat 'Bool
-                          'try 'with 'unit 'fix 'if
+                          'try 'with 'unit 'fix 'if 'cps
                           'true 'false 'Unit 'as 'case 'of 'inl 'inr '=>))
 
 (define (simply-resugar r)
@@ -242,10 +292,11 @@
 
 (show-derivations
  (map simply-resugar
-      #;(list rule_while)
+      #;(list rule_fail rule_and-then rule_or-else)
+      #;(list rule_cps-var rule_cps-lambda rule_cps-apply)
+      (list rule_foreach)
       #;(list rule_c-new)
-      (list rule_newtype)
-      #;(list rule_myapp)
+      #;(list rule_newtype)
       #;(list rule_rec-point rule_rec-sum)
       #;(list rule_ands-empty rule_ands-empty-fixed rule_ands-cons)
       #;(list rule_hlc-bind rule_hlc-guard rule_hlc-let)

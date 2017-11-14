@@ -78,7 +78,7 @@
      (fix e)
      (letrec! x : t = e in e)
      ; list
-     (cons e e)
+     (link e e) ; renamed to avoid name clash with builtin cons
      (isnil e)
      (head e)
      (tail e)
@@ -88,6 +88,8 @@
      ; exists
      (∃ t e as t)
      (let (∃ x x) = e in e)
+     ; begin
+     (begin e e)
      ; builtin
      (calctype e as t in e))
   (param* ::= ϵ a (cons (x : t) param*))
@@ -148,7 +150,8 @@
      (class x extends x class-body rest)
      (call s x s*)
      (new x s*)
-     (cast x s))
+     (cast x s)
+     (cps e))
   (class-body ::= { class-fields & class-constructor & class-methods })
   (class-fields ::= sRec)
   (class-constructor ::= (constructor ((x : t) ...) {
@@ -183,11 +186,6 @@
   fresh-var : -> x
   [(fresh-var)
    ,(fresh-type-var)])
-
-(define-metafunction stlc-syntax
-  fresh-var-named : x -> x
-  [(fresh-var-named x)
-   ,(fresh-type-var-named (term x))])
 
 (define-metafunction stlc-syntax
   append : Γ Γ -> Γ
@@ -263,7 +261,7 @@
 
   [(side-condition ,(variable? (term x)))
    (where #f (lookup x Γ))
-   (where x_Γ (fresh-var-named 'Γ))
+   (where x_Γ ,(fresh-type-var-named 'Γ))
    (where x_t (fresh-var))
    (con (Γ = (bind x x_t x_Γ)))
    ------ t-id-bind
@@ -402,8 +400,8 @@
   [(⊢ Γ e_1 t_1)
    (⊢ Γ e_2 t_2)
    (con (t_2 = (List t_1)))
-   ------ t-cons
-   (⊢ Γ (cons e_1 e_2) t_2)]
+   ------ t-link
+   (⊢ Γ (link e_1 e_2) t_2)]
 
   [(⊢ Γ e t)
    (where x_t (fresh-var))
@@ -461,6 +459,12 @@
    (⊢ (bind x x_ex Γ) e_body t_body)
    ------ t-unpack
    (⊢ Γ (let (∃ x_t x) = e_def in e_body) t_body)]
+
+  ; begin
+  [(⊢ Γ e_1 t_1)
+   (⊢ Γ e_2 t_2)
+   ------ t-begin
+   (⊢ Γ (begin e_1 e_2) t_2)]
 
   ; required for any lang
   [(where x_t ,(atom->type-var (term s))) ; TODO: safety checks!
