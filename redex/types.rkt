@@ -53,6 +53,8 @@
      (pred e)
      (iszero e)
      (+ e e) ; added for convenience
+     ; strings
+     (string-eq e e)
      ; stlc
      (e e ...)
      (λ ((x : t) ...) e)
@@ -151,7 +153,9 @@
      (call s x s*)
      (new x s*)
      (cast x s)
-     (cps e))
+     (cps e)
+     (process-state e*)
+     (process-stream e*))
   (class-body ::= { class-fields & class-constructor & class-methods })
   (class-fields ::= sRec)
   (class-constructor ::= (constructor ((x : t) ...) {
@@ -245,13 +249,20 @@
    (⊢ Γ e_2 t_2)
    (con (t_1 = Nat))
    (con (t_2 = Nat))
-   ------ t-sum
+   ------ t-plus
    (⊢ Γ (+ e_1 e_2) Nat)]
 
   ; strings
 
   [------ t-str
    (⊢ Γ string String)]
+
+  [(⊢ Γ e_1 t_1)
+   (⊢ Γ e_2 t_2)
+   (con (t_1 = String))
+   (con (t_2 = String))
+   ------ t-string-eq
+   (⊢ Γ (string-eq e_1 e_2) Bool)]
 
   ; stlc
   [(side-condition ,(variable? (term x)))
@@ -477,7 +488,13 @@
    (con (t_1 = t_3))
    (⊢ Γ e_2 t_2)
    ------ t-calctype
-   (⊢ Γ (calctype e_1 as t_1 in e_2) t_2)])
+   (⊢ Γ (calctype e_1 as t_1 in e_2) t_2)]
+
+  [(⊢* Γ e*_1 t*_3)
+   (con (t*_1 = t*_3))
+   (⊢ Γ e_2 t_2)
+   ------ t-calctype*
+   (⊢ Γ (calctype* e*_1 as t*_1 in e_2) t_2)])
 
 
 ; subtyping

@@ -32,6 +32,16 @@
         (let x = ~a in ~b)
         (calctype ~a as t in ((λ ((x : t)) ~b) ~a))))
 
+(define rule_lets-1
+  (rule "lets-1" #:capture()
+        (lets ϵ in ~b)
+        ~b))
+
+(define rule_lets-2
+  (rule "lets-2" #:capture()
+        (lets (cons (x = ~a) ~rest) in ~b)
+        ?))
+
 (define rule_or
   (rule "or" #:capture()
         (or ~a ~b)
@@ -234,13 +244,6 @@
   (rule "cps-lambda" #:capture()
         (cps (λ [(x : t)] ~M))
         (calctype (λ [(x : t)] ~M) as (t -> t2) in
-          (λ [(k : ((t -> t2) -> Unit))]
-            (k (λ [(x : t)] ((cps ~M) (λ (y : t2) ?))))))))
-
-#;(define rule_cps-lambda
-  (rule "cps-lambda" #:capture()
-        (cps (λ [(x : t)] ~M))
-        (calctype (λ [(x : t)] ~M) as (t -> t2) in
           (λ [(k : ((t -> ((t2 -> Unit) -> Unit)) -> Unit))]
             (k (λ [(x : t)] (cps ~M)))))))
 
@@ -251,6 +254,60 @@
           (λ [(k : (t2 -> Unit))]
             ((cps ~M) (λ [(m : (t1 -> ((t2 -> Unit) -> Unit)))]
                         ((cps ~N) (λ [(n : t1)] ((m n) k)))))))))
+
+(define rule_process-stream-1
+  (rule "process-stream-1" #:capture()
+        (process-stream ϵ)
+        false))
+
+(define rule_process-stream-2
+  (rule "process-stream-2" #:capture()
+        (process-stream (cons (~label -> ~target) ~rest))
+        (if (string-eq (head stream) ~label)
+            (~target (tail stream))
+            ((process-stream ~rest) stream))))
+
+(define rule_process-state
+  (rule "process-state" #:capture()
+        (process-state ~state)
+        (lambda (stream)
+          (if (isnil stream)
+              true
+              (process-stream ~state)))))
+
+(define rule_automaton-1
+  (rule "automaton-1" #:capture()
+        (automaton ~init-state ϵ)
+        ~init-state))
+
+(define rule_automaton-2
+  (rule "automaton-2" #:capture()
+        (automaton ~init-state (cons (state : ~responses) ~rest))
+        (letrec state = (process-state ~responses)
+        ~init-state)))
+
+
+;(define-syntax automaton
+;(syntax-rules (:)
+;  [( init-state
+;    (state : response · · ·)
+;    · · ·)
+;  (letrec ([state
+;    (process-state response · · ·)]
+;    · · ·)
+;    init-state)]))
+
+;(define-syntax process-state
+;(syntax-rules (→)
+;[( (label → target) · · ·)
+;  (lambda (stream)
+;    (cond
+;      [(empty? stream) true]
+;      [else
+;        (case (first stream)
+;        [(label) (target (rest stream))]
+;        · · ·
+;    [else false])]))]))
 
 ;[[x]] = λk. k x
 ;[[λx.M]] = λk. k (λx. [[M]])
@@ -282,7 +339,8 @@
 ;; Resugaring
 
 ; TODO: derive automatically
-(define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in 'Nat 'Bool
+(define the-literals (set 'λ ': '+ 'pair '-> 'Pair '= 'in
+                          'Nat 'Bool 'String
                           'try 'with 'unit 'fix 'if 'cps
                           'true 'false 'Unit 'as 'case 'of 'inl 'inr '=>))
 
@@ -292,9 +350,11 @@
 
 (show-derivations
  (map simply-resugar
+      (list rule_process-state
+            rule_process-stream-1 rule_process-stream-2)
       #;(list rule_fail rule_and-then rule_or-else)
       #;(list rule_cps-var rule_cps-lambda rule_cps-apply)
-      (list rule_foreach)
+      #;(list rule_foreach)
       #;(list rule_c-new)
       #;(list rule_newtype)
       #;(list rule_rec-point rule_rec-sum)
