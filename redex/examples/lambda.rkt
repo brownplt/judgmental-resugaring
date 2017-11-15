@@ -49,7 +49,8 @@
      (let x = s in s)
      (or s s)
      (seq s s)
-     (sametype s s)))
+     (sametype s s)
+     (cps s)))
 
 
 (define-core-type-system lamb
@@ -157,8 +158,26 @@
         (letrec x : ~t = ~a in ~b)
         ((λ (x : ~t) ~b) (fix (λ (x : ~t) ~a)))))
 
+(define rule_cps-var
+  (ds-rule "cps-var" #:capture()
+           (cps x)
+           x))
 
+(define rule_cps-lambda
+  (ds-rule "cps-lambda" #:capture()
+           (cps (λ (x : t) ~e))
+           (λ (x : Tx) (cps ~e))))
 
+(define rule_cps-apply
+  (ds-rule "cps-apply" #:capture()
+           (cps (~func ~arg))
+           (calctype ~func as (Arg -> Ret) in
+             (λ (k : #;Tk (Ret -> Unit))
+               ((cps ~func)
+                (λ (func : Tfunc #;(Arg -> ((Ret -> Unit) -> Unit)))
+                  ((cps ~arg)
+                   (λ (arg : Targ #;Arg)
+                     ((func arg) k)))))))))
 
 
 
@@ -170,5 +189,6 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype)))
+      (list rule_cps-var rule_cps-lambda rule_cps-apply)
+      #;(list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype)))
 

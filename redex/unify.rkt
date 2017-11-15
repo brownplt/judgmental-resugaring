@@ -350,7 +350,7 @@
 (define-struct Resugared (derivation rule))
 
 (define (make-sugar-rule name conclusion unif)
-  (let* ([make-assum (lambda (eq) (derivation eq "assume" (list)))]
+  (let* ([make-assum (lambda (eq) (derivation eq "premise" (list)))]
          [premises (map make-assum (unification-judgement-list unif))]
          [assumptions (map (λ (a) (make-assum (substitute unif a)))
                            (Unification-assumptions unif))])

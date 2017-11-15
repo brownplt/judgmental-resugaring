@@ -1,7 +1,6 @@
 #lang racket
 
 (require redex)
-(require br/define)
 (require "unify.rkt")
 (require "base-lang.rkt")
 

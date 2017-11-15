@@ -15,7 +15,7 @@
 
 (define-resugarable-language data-lang
   #:keywords(if true false succ pred iszero zero
-                λ thunk let = :
+                λ thunk let = : in
                 pair fst snd tuple project record dot inl inr case of =>
                 link isnil head tail
                 calctype
@@ -25,6 +25,8 @@
      (if e e e)
      ; numbers
      (+ e e)
+     ; strings
+     (string-eq e e)
      ; lambda
      (e e)
      ; let
@@ -48,13 +50,18 @@
      (link e e) ; renamed to avoid name clash with builtin cons
      (isnil e)
      (head e)
-     (tail e))
+     (tail e)
+     ; exception
+     (raise e)
+     (try e with e))
   (v ::= ....
      ; booleans
      true
      false
      ; numbers
      number
+     ; strings
+     string
      ; lambda
      (λ (x : t) e)
      ; list
@@ -63,6 +70,7 @@
   (t ::= ....
      Bool
      Num
+     String
      (t -> t)
      ; pairs
      (Pair t t)
@@ -105,6 +113,17 @@
    (con (t_2 = Num))
    ------ t-plus
    (⊢ Γ (+ e_1 e_2) Nat)]
+
+  ; string
+  [------ t-str
+   (⊢ Γ string String)]
+
+  [(⊢ Γ e_1 t_1)
+   (⊢ Γ e_2 t_2)
+   (con (t_1 = String))
+   (con (t_2 = String))
+   ------ t-string-eq
+   (⊢ Γ (string-eq e_1 e_2) Bool)]
 
   ; lambda
   [(side-condition ,(variable? (term x)))
@@ -236,7 +255,21 @@
    (where x_t (fresh-var))
    (con (t = (List x_t)))
    ------ t-tail
-   (⊢ Γ (tail e) t)])
+   (⊢ Γ (tail e) t)]
+
+  ; exceptions
+  [(⊢ Γ e t)
+   (where x_ret (fresh-var))
+   (con (t = String))
+   ------ t-raise
+   (⊢ Γ (raise e) x_ret)]
+
+  [(⊢ Γ e t)
+   (⊢ Γ e_catch t_catch)
+   (con (t_catch = (String -> t)))
+   ------ t-try
+   (⊢ Γ (try e with e_catch) t)])
+
 
 
 ; pairs
@@ -311,9 +344,9 @@
 ;                       ok _ = []
 ;                    in concatMap ok l
 ; (ignoring _ because the binding cannot fail in our core)
-(define rule_hlc-bind
-  (ds-rule "hlc-bind" #:capture()
-        (hlc ~e (hlc/bind x ~l ~Q)) ; [e | x <- l, Q]
+(define rule_hlc-gen
+  (ds-rule "hlc-gen" #:capture()
+        (hlc ~e (hlc/gen x ~l ~Q)) ; [e | x <- l, Q]
         (calctype ~l as (List t) in ; concatMap (\x. [e | Q]) l
                   ((concatMap (λ (x : t) (hlc ~e ~Q))) ~l))))
  
@@ -324,6 +357,20 @@
         (let x = ~a in (hlc ~e ~Q))))
 
 
+; functional foreach loop
+(define rule_foreach
+  (ds-rule "while" #:capture(break)
+     (foreach x ~list ~body)
+     (letrec loop : ((List a) -> ((List b) -> (List b))) =
+       (λ (lst : (List a))
+         (λ (ans : (List b))
+           (if (isnil lst)
+               ans
+               (try (let break = (λ (_ : Unit) (raise "")) in
+                      (let x = (head lst) in
+                      ((loop (tail lst)) (link ~body ans))))
+                with (λ (_ : String) ans))))) in
+       ((loop ~list) nil))))
 
 
 
@@ -337,7 +384,8 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
+      (list rule_foreach)
+      #;(list rule_foreach rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
             rule_and-then rule_or-else
-            rule_hlc-guard rule_hlc-bind rule_hlc-let)))
+            rule_hlc-guard rule_hlc-gen rule_hlc-let)))
 

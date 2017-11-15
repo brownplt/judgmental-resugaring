@@ -44,31 +44,6 @@
               with (λ [(_ : String)] ans)))) in
        (loop ~list nil))))
 
-; exists
-(define-global id (a -> a))
-
-#;(define rule_newtype ; newtype as a pair
-  (ds-rule "newtype" #:capture()
-        (let-new-type w of T as X in ~body)
-        (let (∃ X w) = (∃ T (pair id id) as
-          (∃ X (Pair (T -> X) (X -> T)))) in
-          ~body)))
-
-#;(define rule_newtype ; newtype as a record
-  (ds-rule "newtype" #:capture()
-        (let-new-type w of T as X in ~body)
-        (let (∃ X w) = (∃ T (record (field wrap id (field unwrap id ϵ))) as
-          (∃ X (Record (field wrap (T -> X) (field unwrap (X -> T) ϵ))))) in
-          ~body)))
-
-(define rule_newtype ; newtype as bindings
-  (ds-rule "newtype" #:capture()
-        (let-new-type (wrap unwrap) of T as X in ~body)
-        (let (∃ X w) = (∃ T (pair id id) as
-          (∃ X (Pair (T -> X) (X -> T)))) in
-          (let! wrap = (fst w) in
-            (let! unwrap = (snd w) in
-              ~body)))))
 
 ; error chaining
 (define rule_fail

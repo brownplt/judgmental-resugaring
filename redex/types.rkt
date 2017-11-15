@@ -38,7 +38,7 @@
 ;;   iso-recurs (TAPL pg.276) -- TODO
 ;;   constraint (TAPL pg.322) -- skip
 ;;   system F   (TAPL pg.343) -- TODO
-;;   existential(TAPL pg.366) -- TODO (mostly done)
+;;   existential(TAPL pg.366)
 
 ;; Potential Resugaring Examples:
 ;;   encoding existentials (TAPL 24.3 pg.377)
