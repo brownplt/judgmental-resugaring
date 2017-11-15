@@ -8,12 +8,14 @@
  (rename-out (resugar-rule resugar))
  (struct-out Resugared)
  ; desugaring rules
- (rename-out (make-rule rule))
+ (rename-out (make-rule ds-rule))
  ; freshness
  fresh-type-var
  fresh-type-var-named
  atom->type-var
  unfreshen
+ ; keywords
+ set-language-keywords!
  ; globals
  define-global
  global-exists?
@@ -35,7 +37,10 @@
     [(list 'bind x t Γ)
      (if (member x (fresh-vars))
          (unfreshen Γ)
-         (list 'bind x t (unfreshen Γ)))]))
+         (list 'bind x t (unfreshen Γ)))]
+    ; TODO: warnings
+    [(list 'bind* x* t* Γ)
+     (list 'bind* x* t* (unfreshen Γ))]))
 
 (define-struct DsRule (name fresh lhs rhs))
 
@@ -94,9 +99,14 @@
 ;; ------------------------------------------------------------
 ;; Language Literals
 
+(define language-literals-map (make-hash))
+
+(define (set-language-keywords! lang literals)
+  (hash-set! language-literals-map lang literals))
+
 (define language-literals (make-parameter (set)))
 
-(define meta-literals (set 'cons 'field 'bind 'ϵ))
+(define meta-literals (set 'cons 'field 'bind 'bind* 'ϵ))
 
 (define (pattern-variable? x)
   (string-prefix? (symbol->string x) "~"))
@@ -126,6 +136,8 @@
      (set-union (get-variables expr) (get-variables exprs))]
     [(list 'bind x expr exprs)
      (set-union (get-variables expr) (get-variables exprs))]
+    [(list 'bind* xs exprs exprs2)
+     (set-union (get-variables exprs) (get-variables exprs2))]
     [(? list?)
      (foldl set-union (set) (map get-variables t))]))
 
@@ -155,7 +167,7 @@
 (define (display-equation eq)
   (display (format "  ~a = ~a\n" (Equation-left eq) (Equation-right eq))))
 
-(define-struct Judgement (env id type))
+(define-struct Judgement (env id type *?))
 
 (define-struct Equation (left right))
 
@@ -168,7 +180,9 @@
     [(list '⋖ a b)
      (Assumption (list '⋖ a b))]
     [(list Γ '⊢ x ': t)
-     (Judgement Γ x t)]
+     (Judgement Γ x t #f)]
+    [(list Γ '⊢* x ': t)
+     (Judgement Γ x t #t)]
     [(list 'assumption contents)
      (Assumption contents)]))
 
@@ -181,8 +195,9 @@
     [(Judgement? eq)
      (let [[Γ (Judgement-env eq)]
            [x (Judgement-id eq)]
-           [t (Judgement-type eq)]]
-       (list Γ '⊢ x ': t))]
+           [t (Judgement-type eq)]
+           [⊢ (if (Judgement-*? eq) '⊢* '⊢)]]
+       (list Γ ⊢ x ': t))]
     [else
      (list x '= eq)]))
 
@@ -267,7 +282,8 @@
     [(? Judgement? expr)
      (Judgement (recur (Judgement-env expr))
                 (Judgement-id expr)
-                (recur (Judgement-type expr)))]
+                (recur (Judgement-type expr))
+                (Judgement-*? expr))]
     [_ (error 'replace "fell off match")]))
 
 (define (substitute unif t)
@@ -285,6 +301,8 @@
      (list 'field x (recur t) (recur ts))]
     [(list 'bind x t ts)
      (list 'bind x (recur t) (recur ts))]
+    [(list 'bind* x* t* ts)
+     (list 'bind* (substitute unif x*) (substitute unif t*) (substitute unif ts))]
     [(list x '⋖ y)
      (list (substitute unif x) '⋖ (substitute unif y))]
     [(? list? t)
@@ -292,7 +310,8 @@
     [(? Judgement? t)
      (Judgement (recur (Judgement-env t))
                 (Judgement-id t)
-                (recur (Judgement-type t)))]
+                (recur (Judgement-type t))
+                (Judgement-*? t))]
     [_ (error 'substitute "fell off cond ~a" t)]))
 
 (define (occurs? x t)
@@ -356,13 +375,13 @@
          [unif (unify premises (new-unification))]
          [concl-type (fourth (derivation-term deriv))]
          [concl-env (second (derivation-term deriv))]
-         [concl (write-premise #f (Judgement concl-env (DsRule-lhs rule) concl-type))]
+         [concl (write-premise #f (Judgement concl-env (DsRule-lhs rule) concl-type #f))]
          [tyrule (make-sugar-rule (DsRule-name rule) concl unif)]]
     (Resugared deriv tyrule)))
 
-(define-syntax-rule (resugar-rule rule ty literals globals)
+(define-syntax-rule (resugar-rule lang rule ty)
   (parameterize ([fresh-vars (DsRule-fresh rule)]
-                 [language-literals literals])
+                 [language-literals (hash-ref language-literals-map 'lang)])
     (reset-names!)
     (let [[derivations (build-derivations (ty Γ ,(DsRule-rhs rule) _))]]
       (when (not (eq? 1 (length derivations)))
@@ -393,7 +412,7 @@
 
 (define (equate-judgements j1 j2 unif)
   (match* [j1 j2]
-    [[(Judgement Γ1 x t1) (Judgement Γ2 x t2)]
+    [[(Judgement Γ1 x t1 _) (Judgement Γ2 x t2 _)]
      (equate-envs Γ1 Γ2 (equate t1 t2 unif))]))
 
 (define (equate-envs Γ1 Γ2 unif)
@@ -401,7 +420,7 @@
   (equate Γ1 Γ2 unif))
 
 (define (equate x y unif)
-  (printf "~a = ~a\n" x y)
+  (debug "~a = ~a\n" x y)
   (define (take-field x rec) ; overloaded for 'bind
     (match rec
       ['ϵ (values #f rec)]
@@ -415,9 +434,8 @@
                  (values #f rec))))]))
   
   (define (equate-fields name rec1 rec2 unif) ; overloaded for 'bind
-    (printf "~a =r ~a\n" rec1 rec2)
+    (debug "~a =r ~a\n" rec1 rec2)
     (define (recur rec1 rec2 um1 um2 unif)
-      (printf "  ~a =u ~a & ~a & ~a\n" rec1 rec2 um1 um2)
       (match* [rec1 rec2]
         [[(list (or 'field 'bind) x val1 rec1*) _]
          (let-values [[[val2 rec2] (take-field x rec2)]]

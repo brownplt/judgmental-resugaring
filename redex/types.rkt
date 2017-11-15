@@ -18,7 +18,7 @@
 ;;   stlc       (TAPL pg.103)
 ;;   unit       (TAPL pg.119)
 ;;   ascription (TAPL pg.122)
-;;   let        (TAPL pg.124) (called let_)
+;;   let        (TAPL pg.124)
 ;;   pairs      (TAPL pg.126)
 ;;   tuples     (TAPL pg.128) (subsumes pairs)
 ;;   records    (TAPL pg.129)
@@ -114,7 +114,7 @@
      (record vRec)
      ; list
      nil
-     (cons v v)
+     (link v v)
      ; exists
      (∃ t v as t))
   (v* ::= ϵ (cons v v*)) ; for all langs
@@ -245,12 +245,7 @@
   [------ t-num
    (⊢ Γ n Nat)]
 
-  [(⊢ Γ e_1 t_1)
-   (⊢ Γ e_2 t_2)
-   (con (t_1 = Nat))
-   (con (t_2 = Nat))
-   ------ t-plus
-   (⊢ Γ (+ e_1 e_2) Nat)]
+
 
   ; strings
 
@@ -328,67 +323,7 @@
    ------ t-ascribe
    (⊢ Γ (e as t_1) t_1)]
 
-  ; let
-  [(⊢ Γ e_1 t_1)
-   (⊢ (bind x t_1 Γ) e_2 t_2)
-   ------ t-let
-   (⊢ Γ (let! x = e_1 in e_2) t_2)]
 
-  ; pairs
-  [(⊢ Γ e_1 t_1)
-   (⊢ Γ e_2 t_2)
-   ------ t-pair
-   (⊢ Γ (pair e_1 e_2) (Pair t_1 t_2))]
-
-  [(⊢ Γ e t)
-   (where x_t1 (fresh-var))
-   (where x_t2 (fresh-var))
-   (con (t = (Pair x_t1 x_t2)))
-   ------ t-fst
-   (⊢ Γ (fst e) x_t1)]
-
-  [(⊢ Γ e t)
-   (where x_t1 (fresh-var))
-   (where x_t2 (fresh-var))
-   (con (t = (Pair x_t1 x_t2)))
-   ------ t-snd
-   (⊢ Γ (snd e) x_t2)]
-
-  ; tuples
-  [(⊢* Γ e* t*)
-   ------ t-tuple
-   (⊢ Γ (tuple e*) (Tuple t*))]
-
-  [(⊢ Γ e t_e)
-   (where x* (fresh-var))
-   (con (t_e = (Tuple x*)))
-   (@t x* n t)
-   ------ t-proj
-   (⊢ Γ (project e n) t)]
-
-  ; records
-  ; TODO
-
-  ; sums
-  [(⊢ Γ e t)
-   (where x_t (fresh-var))
-   ------ t-inl
-   (⊢ Γ (inl e) (Sum t x_t))]
-
-  [(⊢ Γ e t)
-   (where x_t (fresh-var))
-   ------ t-inr
-   (⊢ Γ (inr e) (Sum x_t t))]
-
-  [(where x_t1 (fresh-var))
-   (where x_t2 (fresh-var))
-   (⊢ Γ e t)
-   (con (t = (Sum x_t1 x_t2)))
-   (⊢ (bind x_1 x_t1 Γ) e_1 t_1)
-   (⊢ (bind x_2 x_t2 Γ) e_2 t_2)
-   (con (t_1 = t_2))
-   ------ t-case
-   (⊢ Γ (case e of (inl x_1 => e_1) (inr x_2 => e_2)) t_1)]
 
   ; fix
   [(⊢ Γ e t)
@@ -403,35 +338,6 @@
    ------ t-letrec
    (⊢ Γ (letrec! x : t = e_1 in e_2) t_2)]
 
-  ; list
-  [(where x_t (fresh-var))
-   ------ t-nil
-   (⊢ Γ nil x_t)]
-
-  [(⊢ Γ e_1 t_1)
-   (⊢ Γ e_2 t_2)
-   (con (t_2 = (List t_1)))
-   ------ t-link
-   (⊢ Γ (link e_1 e_2) t_2)]
-
-  [(⊢ Γ e t)
-   (where x_t (fresh-var))
-   (con (t = (List x_t)))
-   ------ t-isnil
-   (⊢ Γ (isnil e) Bool)]
-
-  [(⊢ Γ e t)
-   (where x_t (fresh-var))
-   (con (t = (List x_t)))
-   ------ t-head
-   (⊢ Γ (head e) x_t)]
-
-  [(⊢ Γ e t)
-   (where x_t (fresh-var))
-   (con (t = (List x_t)))
-   ------ t-tail
-   (⊢ Γ (tail e) t)]
-
   ; exceptions
 
   [(⊢ Γ e t)
@@ -445,18 +351,6 @@
    (con (t_catch = (String -> t)))
    ------ t-try
    (⊢ Γ (try e with e_catch) t)]
-
-  ; record
-  [(⊢rec Γ eRec tRec)
-   ------ t-rec
-   (⊢ Γ (record eRec) (Record tRec))]
-
-  [(⊢ Γ e t_e)
-   (where x_rec (fresh-var))
-   (con (t_e = (Record x_rec)))
-   (@rec x_rec x t)
-   ------ t-dot
-   (⊢ Γ (dot e x) t)]
 
   ; exists
   [(⊢ Γ e t_e)

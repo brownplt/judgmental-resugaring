@@ -7,180 +7,32 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; Desugaring Rules
 
-(define rule_not
-  (rule "not" #:capture()
-        (not ~a)
-        (if ~a false true)))
 
-(define rule_unless
-  (rule "unless" #:capture()
-        (unless ~a ~b ~c)
-        (if ~a ~c ~b)))
-
-(define rule_ifzero
-  (rule "ifzero" #:capture()
-        (ifzero ~a ~b ~c)
-        (if (iszero ~a) ~b ~c)))
-
-(define rule_thunk
-  (rule "thunk" #:capture()
-        (thunk ~a)
-        (λ ((x : Nat)) ~a)))
-
-(define rule_let
-  (rule "let" #:capture()
-        (let x = ~a in ~b)
-        (calctype ~a as t in ((λ ((x : t)) ~b) ~a))))
-
-(define rule_lets-1
-  (rule "lets-1" #:capture()
-        (lets ϵ in ~b)
-        ~b))
-
-(define rule_lets-2
-  (rule "lets-2" #:capture()
-        (lets (cons (x = ~a) ~rest) in ~b)
-        ?))
-
-(define rule_or
-  (rule "or" #:capture()
-        (or ~a ~b)
-        ((λ ((x : Bool)) (if x x ~b)) ~a)))
-
-(define rule_seq
-  (rule "seq" #:capture()
-        (seq ~a ~b)
-        ((λ ((x : Unit)) ~b) ~a)))
-
-(define rule_sametype
-  (rule "sametype" #:capture()
-        (sametype ~a ~b)
-        (calctype ~b as x_t in (~a as x_t))))
-
-(define rule_let-pair
-  (rule "let-pair" #:capture()
-        (let-pair x y = ~a in ~b)
-        (calctype ~a as (Pair t_1 t_2) in
-                  (let! p = ~a in
-                        (let! x = (fst p) in
-                              (let! y = (snd p) in
-                                    ~b))))))
-
-; contrived
-(define rule_sum-or
-  (rule "sum-or" #:capture()
-        (sum-or ~a ~b)
-        (case ~a of
-          (inl x => ~b)
-          (inr x => (inr x)))))
-
-; contrived
-(define rule_sum-map
-  (rule "sum-map" #:capture()
-        (sum-or-else ~a ok ~b)
-        (case ~a of
-          (inl err => (inl err))
-          (inr ok => (inr ~b)))))
-
-(define rule_letrec
-  (rule "letrec" #:capture()
-        (letrec x : ~t = ~a in ~b)
-        (let! x = (fix (λ ((x : ~t)) ~a)) in ~b)))
-
-(define rule_for-map
-  (rule "for-map" #:capture()
-        (for-map x ~list ~body)
-        (calctype ~list as (List elem) in
-         (calctype (λ ((x : elem)) ~body) as (elem -> out) in
-                   (letrec! f : ((List elem) -> (List out))
-                            = (λ ((l : (List elem)))
-                                (if (isnil l)
-                                    nil
-                                    (let! x = (head l) in
-                                          (cons ~body (f (tail l))))))
-                            in (f ~list))))))
-
-(define rule_tuple2
-  (rule "tuple2" #:capture()
-        (tuple2 ~a ~b)
-        (tuple (cons ~a (cons ~b ϵ)))))
-
-(define rule_my-tuple
-  (rule "my-tuple" #:capture()
-        (my-tuple ~a)
-        (tuple ~a)))
-
-(define rule_my-proj
-  (rule "my-proj" #:capture()
-        (my-proj ~a)
-        (project (tuple ~a) 2)))
-
-;; Haskell List Comprehensions ;;
-
-(define-global concatMap
-  ((i -> (List o)) (List i) -> (List o)))
-
-; [e | b, Q] = if b then [e | Q] else []
-(define rule_hlc-guard
-  (rule "hlc-guard" #:capture()
-        (hlc ~e (hlc/guard ~b ~Q))
-        (if ~b (hlc ~e ~Q) nil)))
-
-; [e | p <- l, Q] = let ok p = [e | Q]
-;                       ok _ = []
-;                    in concatMap ok l
-; TODO: handle the underscore stuff
-(define rule_hlc-bind
-  (rule "hlc-bind" #:capture()
-        (hlc ~e (hlc/bind x ~l ~Q)) ; [e | x <- l, Q]
-        (calctype ~l as (List t) in ; concatMap (\x. [e | Q]) l
-                  (concatMap (λ ((x : t)) (hlc ~e ~Q)) ~l))))
- 
-; [e | let decls, Q] = let decls in [e | Q]
-; TODO: this is singleton let
-(define rule_hlc-let
-  (rule "hlc-let" #:capture()
-        (hlc ~e (hlc/let x = ~a in ~Q))
-        (let! x = ~a in (hlc ~e ~Q))))
+; capturing example
+(define rule_method
+  (ds-rule "method" #:capture(this)
+        (method (arg : t) ~body)
+        (λ ((obj : o)) (λ ((arg : t)) (let this = obj in ~body)))))
 
 ; ellipses example
 (define rule_ands-empty
-  (rule "ands-empty" #:capture()
+  (ds-rule "ands-empty" #:capture()
         (ands (cons ~a ϵ))
         ~a))
 
 (define rule_ands-empty-fixed
-  (rule "ands-empty-fixed" #:capture()
+  (ds-rule "ands-empty-fixed" #:capture()
         (ands (cons ~a ϵ))
         (calctype ~a as Bool in ~a)))
 
 (define rule_ands-cons
-  (rule "ands-cons" #:capture()
+  (ds-rule "ands-cons" #:capture()
         (ands (cons ~a (cons ~b ~cs)))
         (if ~a true (ands (cons ~b ~cs)))))
 
-; capturing example
-(define rule_method
-  (rule "method" #:capture(this)
-        (method (arg : t) ~body)
-        (λ ((obj : o)) (λ ((arg : t)) (let! this = obj in ~body)))))
-
-; records
-(define rule_rec-point
-  (rule "rec-point" #:capture()
-        (rec-point ~a ~b)
-        (record (field x ~a (field y ~b ϵ)))))
-
-(define rule_rec-sum
-  (rule "rec-sum" #:capture()
-        (rec-sum ~rec x y)
-        (let! r = ~rec in
-              (+ (dot r x)
-                 (dot r y)))))
-
 ; exceptions
 (define rule_foreach
-  (rule "while" #:capture(break)
+  (ds-rule "while" #:capture(break)
      (foreach x ~list ~body)
      (letrec! loop : ((List a) (List b) -> (List b)) =
        (λ [(lst : (List a)) (ans : (List b))]
@@ -196,21 +48,21 @@
 (define-global id (a -> a))
 
 #;(define rule_newtype ; newtype as a pair
-  (rule "newtype" #:capture()
+  (ds-rule "newtype" #:capture()
         (let-new-type w of T as X in ~body)
         (let (∃ X w) = (∃ T (pair id id) as
           (∃ X (Pair (T -> X) (X -> T)))) in
           ~body)))
 
 #;(define rule_newtype ; newtype as a record
-  (rule "newtype" #:capture()
+  (ds-rule "newtype" #:capture()
         (let-new-type w of T as X in ~body)
         (let (∃ X w) = (∃ T (record (field wrap id (field unwrap id ϵ))) as
           (∃ X (Record (field wrap (T -> X) (field unwrap (X -> T) ϵ))))) in
           ~body)))
 
 (define rule_newtype ; newtype as bindings
-  (rule "newtype" #:capture()
+  (ds-rule "newtype" #:capture()
         (let-new-type (wrap unwrap) of T as X in ~body)
         (let (∃ X w) = (∃ T (pair id id) as
           (∃ X (Pair (T -> X) (X -> T)))) in
@@ -220,35 +72,35 @@
 
 ; error chaining
 (define rule_fail
-  (rule "fail" #:capture()
+  (ds-rule "fail" #:capture()
         (fail)
         (raise "%fail")))
 
 (define rule_and-then
-  (rule "and-then" #:capture()
+  (ds-rule "and-then" #:capture()
         (and-then ~a ~b)
         (begin ~a ~b)))
 
 (define rule_or-else
-  (rule "or-else" #:capture()
+  (ds-rule "or-else" #:capture()
         (or-else ~a ~b)
         (try ~a with (λ [(err : String)] ~b))))
 
 ; cps (https://xavierleroy.org/publi/cps-dargaye-leroy.pdf)
 (define rule_cps-var
-  (rule "cps-var" #:capture()
+  (ds-rule "cps-var" #:capture()
         (cps x)
         (calctype x as t in (λ [(k : (t -> Unit))] (k x)))))
 
 (define rule_cps-lambda
-  (rule "cps-lambda" #:capture()
+  (ds-rule "cps-lambda" #:capture()
         (cps (λ [(x : t)] ~M))
         (calctype (λ [(x : t)] ~M) as (t -> t2) in
           (λ [(k : ((t -> ((t2 -> Unit) -> Unit)) -> Unit))]
             (k (λ [(x : t)] (cps ~M)))))))
 
 (define rule_cps-apply
-  (rule "cps-apply" #:capture()
+  (ds-rule "cps-apply" #:capture()
         (cps (~M ~N))
         (calctype ~M as (t1 -> t2) in
           (λ [(k : (t2 -> Unit))]
@@ -256,19 +108,19 @@
                         ((cps ~N) (λ [(n : t1)] ((m n) k)))))))))
 
 (define rule_process-stream-1
-  (rule "process-stream-1" #:capture()
+  (ds-rule "process-stream-1" #:capture()
         (process-stream ϵ)
         false))
 
 (define rule_process-stream-2
-  (rule "process-stream-2" #:capture()
+  (ds-rule "process-stream-2" #:capture()
         (process-stream (cons (~label -> ~target) ~rest))
         (if (string-eq (head stream) ~label)
             (~target (tail stream))
             ((process-stream ~rest) stream))))
 
 (define rule_process-state
-  (rule "process-state" #:capture()
+  (ds-rule "process-state" #:capture()
         (process-state ~state)
         (lambda (stream)
           (if (isnil stream)
@@ -276,12 +128,12 @@
               (process-stream ~state)))))
 
 (define rule_automaton-1
-  (rule "automaton-1" #:capture()
+  (ds-rule "automaton-1" #:capture()
         (automaton ~init-state ϵ)
         ~init-state))
 
 (define rule_automaton-2
-  (rule "automaton-2" #:capture()
+  (ds-rule "automaton-2" #:capture()
         (automaton ~init-state (cons (state : ~responses) ~rest))
         (letrec state = (process-state ~responses)
         ~init-state)))
@@ -315,7 +167,7 @@
 
 ; classes
 (define rule_c-new
-  (rule "new" #:capture()
+  (ds-rule "new" #:capture()
         (new C ~args)
         ((dot C construct) ~args)))
 
