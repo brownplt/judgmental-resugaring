@@ -15,11 +15,11 @@
 
 (define-resugarable-language data-lang
   #:keywords(if true false succ pred iszero zero
-                λ thunk let = : in
-                pair fst snd tuple project record dot inl inr case of =>
+                λ thunk let = : in => as
+                pair fst snd tuple project record dot inl inr case of
                 link isnil head tail
                 calctype
-                Bool Num Pair Tuple Sum Record List ->)
+                Bool Num String Pair Tuple Sum Record List ->)
   (e ::= ....
      ; booleans
      (if e e e)
@@ -46,6 +46,9 @@
      (inl e)
      (inr e)
      (case e of (inl x => e) (inr x => e))
+     ; variant
+     (variant x = e as t)
+     (case e of variantcases)
      ; list
      (link e e) ; renamed to avoid name clash with builtin cons
      (isnil e)
@@ -54,6 +57,7 @@
      ; exception
      (raise e)
      (try e with e))
+  (variantcases ::= ϵ (cons (x = x => e) variantcases))
   (v ::= ....
      ; booleans
      true
@@ -78,6 +82,8 @@
      (Tuple t*)
      ; sum
      (Sum t t)
+     ; variant
+     (Variant tRec)
      ; record
      (Record tRec)
      ; list
@@ -228,6 +234,27 @@
    ------ t-case
    (⊢ Γ (case e of (inl x_1 => e_1) (inr x_2 => e_2)) t_1)]
 
+  ;variants
+  [(@rec tRec x t)
+   (⊢ Γ e t_e)
+   (con (t_e = t))
+   ------ t-variant
+   (⊢ Γ (variant x = e as (Variant tRec)) (Variant tRec))]
+
+  [(where x_t (fresh-var))
+   ------ t-vcase-empty
+   (⊢ Γ (case e of ϵ) x_t)]
+  
+  [(⊢ Γ e_var t_e)
+   (where x_rec (fresh-var))
+   (con (t_e = (Variant x_rec)))
+   (@rec x_rec x_label t)
+   (⊢ (bind x t Γ) e t_ans)
+   (⊢ Γ (case e_var of variantcases) t_ans2)
+   (con (t_ans = t_ans2))
+   ------ t-vcase-cons
+   (⊢ Γ (case e_var of (cons (x_label = x => e) variantcases)) t_ans)]
+
   ; list
   [(where x_t (fresh-var))
    ------ t-nil
@@ -315,6 +342,39 @@
           (inl err => (inl err))
           (inr ok => (inr ~b)))))
 
+; variant sanity check
+(define rule_test
+  (ds-rule "test" #:capture()
+           (test x)
+           (let v = (variant x = 3 as
+                             (Variant
+                              (field y String
+                               (field x Num ϵ))))
+             in (case v of (cons (y = a => 0)
+                                 (cons (x = b => b) ϵ))))))
+
+; variants: prove that variants make sums irrelevant
+(define rule_inl
+  (ds-rule "inl" #:capture()
+           (inl* ~l)
+           (calctype ~l as t_l in
+             (variant l = ~l as
+               (Variant (field l t_l (field r t_r ϵ)))))))
+
+(define rule_inr
+  (ds-rule "inr" #:capture()
+           (inr* ~r)
+           (calctype ~r as t_r in
+             (variant r = ~r as
+               (Variant (field l t_l (field r t_r ϵ)))))))
+
+(define rule_case
+  (ds-rule "case" #:capture()
+           (case* ~e of (x => ~l) (y => ~r))
+           (case ~e of (cons (l = x => ~l)
+                         (cons (r = y => ~r) ϵ)))))
+
+; Pyret-style for loop
 (define rule_for-map
   (ds-rule "for-map" #:capture()
         (for-map x ~list ~body)
@@ -359,7 +419,7 @@
 
 ; functional foreach loop
 (define rule_foreach
-  (ds-rule "while" #:capture(break)
+  (ds-rule "foreach" #:capture(break)
      (foreach x ~list ~body)
      (letrec loop : ((List a) -> ((List b) -> (List b))) =
        (λ (lst : (List a))
@@ -384,8 +444,9 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_foreach)
-      #;(list rule_foreach rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
+      (list rule_foreach
+            rule_inl rule_inr rule_case
+            rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
             rule_and-then rule_or-else
             rule_hlc-guard rule_hlc-gen rule_hlc-let)))
 
