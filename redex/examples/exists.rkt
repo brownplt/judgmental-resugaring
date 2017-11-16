@@ -150,6 +150,11 @@
 
 (define-global id (a -> a))
 
+(define rule_or
+  (ds-rule "or" #:capture()
+        (or ~a ~b)
+        (let x = ~a in (if x x ~b))))
+
 ; newtype as a pair
 #;(define rule_newtype
   (ds-rule "newtype" #:capture()
@@ -183,8 +188,8 @@
 
 
 (define (do-resugar rule)
-  (Resugared-rule (resugar exists-lang rule ⊢)))
+  (Resugared-simplified-derivation (resugar exists-lang rule ⊢)))
 
 (show-derivations
  (map do-resugar
-      (list rule_newtype)))
+      (list rule_or rule_newtype)))

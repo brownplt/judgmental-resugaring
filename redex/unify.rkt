@@ -347,7 +347,7 @@
 ;; ------------------------------------------------------------
 ;; Resugaring
 
-(define-struct Resugared (derivation rule))
+(define-struct Resugared (rule derivation simplified-derivation))
 
 (define (make-sugar-rule name conclusion unif)
   (let* ([make-assum (lambda (eq) (derivation eq "premise" (list)))]
@@ -377,7 +377,16 @@
          [concl-env (second (derivation-term deriv))]
          [concl (write-premise #f (Judgement concl-env (DsRule-lhs rule) concl-type #f))]
          [tyrule (make-sugar-rule (DsRule-name rule) concl unif)]]
-    (Resugared deriv tyrule)))
+    (Resugared tyrule deriv (simplify-derivation deriv unif))))
+
+(define (simplify-derivation deriv unif)
+  (if (equal? (derivation-name deriv) "con-equal")
+      #f
+      (derivation (substitute unif (derivation-term deriv))
+                  (derivation-name deriv)
+                  (filter (λ (d) d)
+                          (map (λ (d) (simplify-derivation d unif))
+                               (derivation-subs deriv))))))
 
 (define-syntax-rule (resugar-rule lang rule ty)
   (parameterize ([fresh-vars (DsRule-fresh rule)]

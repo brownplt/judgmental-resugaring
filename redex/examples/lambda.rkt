@@ -189,6 +189,7 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_cps-var rule_cps-lambda rule_cps-apply)
+      (list rule_let rule_letrec)
+      #;(list rule_cps-var rule_cps-lambda rule_cps-apply)
       #;(list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype)))
 

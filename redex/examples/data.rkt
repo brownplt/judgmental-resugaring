@@ -440,11 +440,12 @@
 
 
 (define (do-resugar rule)
-  (Resugared-rule (resugar data-lang rule ⊢)))
+  (Resugared-derivation (resugar data-lang rule ⊢)))
 
 (show-derivations
  (map do-resugar
-      (list rule_foreach
+      (list rule_case)
+      #;(list rule_foreach
             rule_inl rule_inr rule_case
             rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
             rule_and-then rule_or-else
