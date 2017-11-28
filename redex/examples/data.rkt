@@ -3,15 +3,14 @@
 (require redex)
 (require "../resugar.rkt")
 
-;;   booleans   (TAPL pg.93)
-;;   nats       (TAPL pg.93)
-;;   lambda     (TAPL pg.103)
-
+;;   let        (TAPL pg.124)
 ;;   pairs      (TAPL pg.126)
 ;;   tuples     (TAPL pg.128)
 ;;   records    (TAPL pg.129)
 ;;   sums       (TAPL pg.132)
+;;   variants   (TAPL pg.136)
 ;;   lists      (TAPL pg.147)
+;;   exceptions (TAPL pg.174)
 
 (define-resugarable-language data-lang
   #:keywords(if true false succ pred iszero zero
@@ -89,7 +88,8 @@
      ; list
      (List t))
   (s ::= ....
-     (hlc s s)))
+     (hlc s s)
+     (λret (x : t) s)))
 
 
 (define-core-type-system data-lang
@@ -286,8 +286,8 @@
 
   ; exceptions
   [(⊢ Γ e t)
-   (where x_ret (fresh-var))
    (con (t = String))
+   (where x_ret (fresh-var))
    ------ t-raise
    (⊢ Γ (raise e) x_ret)]
 
@@ -335,9 +335,9 @@
           (inl x => ~b)
           (inr x => (inr x)))))
 
-(define rule_or-else
+(define rule_sum-map
   (ds-rule "sum-map" #:capture()
-        (or-else ~a ok ~b)
+        (sum-map ~a ok ~b)
         (case ~a of
           (inl err => (inl err))
           (inr ok => (inr ~b)))))
@@ -373,6 +373,12 @@
            (case* ~e of (x => ~l) (y => ~r))
            (case ~e of (cons (l = x => ~l)
                          (cons (r = y => ~r) ϵ)))))
+
+; or with let
+(define rule_or
+  (ds-rule "or" #:capture()
+        (or ~a ~b)
+        (let x = ~a in (if x x ~b))))
 
 ; Pyret-style for loop
 (define rule_for-map
@@ -416,7 +422,7 @@
         (hlc ~e (hlc/let x = ~a in ~Q))
         (let x = ~a in (hlc ~e ~Q))))
 
-
+; raise
 ; functional foreach loop
 (define rule_foreach
   (ds-rule "foreach" #:capture(break)
@@ -432,7 +438,13 @@
                 with (λ (_ : String) ans))))) in
        ((loop ~list) nil))))
 
-
+(define rule_λret
+  (ds-rule "λret" #:capture(return)
+           (λret (x : T) ~b)
+           (λ (x : T)
+             (try (let return = (λ (v : String) (raise v)) in
+                    ~b)
+              with (λ (v : String) v)))))
 
 
 
@@ -440,14 +452,13 @@
 
 
 (define (do-resugar rule)
-  (Resugared-derivation (resugar data-lang rule ⊢)))
+  (Resugared-rule (resugar data-lang rule ⊢)))
 
 (show-derivations
  (map do-resugar
-      (list rule_case)
-      #;(list rule_foreach
+      (list rule_foreach rule_λret
             rule_inl rule_inr rule_case
             rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
-            rule_and-then rule_or-else
+            rule_and-then rule_sum-map rule_or
             rule_hlc-guard rule_hlc-gen rule_hlc-let)))
 

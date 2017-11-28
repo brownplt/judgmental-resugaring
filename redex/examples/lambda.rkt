@@ -3,8 +3,6 @@
 (require redex)
 (require "../resugar.rkt")
 
-;;   booleans   (TAPL pg.93)
-;;   nats       (TAPL pg.93)
 ;;   lambda     (TAPL pg.103)
 ;;   unit       (TAPL pg.119)
 ;;   ascription (TAPL pg.122)
@@ -14,7 +12,7 @@
   #:keywords(if true false succ pred iszero zero
                 fix as λ unit thunk let = :
                 calctype
-                Bool Nat Unit ->)
+                Bool Nat String Unit ->)
   (e ::= ....
      ; booleans
      (if e e e)
@@ -35,6 +33,8 @@
      false
      ; nats
      zero
+     ; strings
+     string
      ; lambda
      (λ (x : t) e)
      ; unit
@@ -42,6 +42,7 @@
   (t ::= ....
      Bool
      Nat
+     String
      Unit
      (t -> t))
   (s ::= ....
@@ -50,7 +51,8 @@
      (or s s)
      (seq s s)
      (sametype s s)
-     (cps s)))
+     (cps s)
+     (cond s*)))
 
 
 (define-core-type-system lamb
@@ -83,6 +85,10 @@
    (con (t = Nat))
    ------ t-iszero
    (⊢ Γ (iszero e) Bool)]
+
+  ; string
+  [------ t-str
+   (⊢ Γ string String)]
 
   ; lambda
   [(side-condition ,(variable? (term x)))
@@ -138,6 +144,11 @@
         (let x = ~a in ~b)
         (calctype ~a as t in ((λ (x : t) ~b) ~a))))
 
+(define rule_and
+  (ds-rule "and" #:capture()
+        (and ~a ~b)
+        (if ~a ~b false)))
+
 (define rule_or
   (ds-rule "or" #:capture()
         (or ~a ~b)
@@ -163,6 +174,12 @@
            (cps x)
            x))
 
+; to contrast with typed racket
+(define rule_of-one
+  (ds-rule "of-one" #:capture()
+           (of-one ~f)
+           (~f "one")))
+
 (define rule_cps-lambda
   (ds-rule "cps-lambda" #:capture()
            (cps (λ (x : t) ~e))
@@ -172,11 +189,11 @@
   (ds-rule "cps-apply" #:capture()
            (cps (~func ~arg))
            (calctype ~func as (Arg -> Ret) in
-             (λ (k : #;Tk (Ret -> Unit))
+             (λ (k : (Ret -> Unit))
                ((cps ~func)
-                (λ (func : Tfunc #;(Arg -> ((Ret -> Unit) -> Unit)))
+                (λ (func : (Arg -> ((Ret -> Unit) -> Unit)))
                   ((cps ~arg)
-                   (λ (arg : Targ #;Arg)
+                   (λ (arg : Arg)
                      ((func arg) k)))))))))
 
 
@@ -189,7 +206,6 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_let rule_letrec)
-      #;(list rule_cps-var rule_cps-lambda rule_cps-apply)
-      #;(list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype)))
+      (list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype
+            rule_cps-var rule_cps-lambda rule_cps-apply)))
 

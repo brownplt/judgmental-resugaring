@@ -3,12 +3,8 @@
 (require redex)
 (require "../resugar.rkt")
 
-;;   booleans   (TAPL pg.93)
-;;   nats       (TAPL pg.93)
-;;   lambda     (TAPL pg.103)
-;;   unit       (TAPL pg.119)
-;;   ascription (TAPL pg.122)
-;;   fix        (TAPL pg.144)
+;; Multi-arity lambda example.
+;; This extends TAPL lambdas to handle multiple arguments.
 
 (define-resugarable-language multi
   #:keywords(if true false succ pred iszero zero
@@ -37,7 +33,8 @@
      Num
      (t* -> t))
   (s ::= ....
-     (let bind* s))
+     (let bind* s)
+     (ands s*))
   #;(bind* ::= ϵ x (cons (x = s) bind*) (x* = s* ..)))
 
 
@@ -141,13 +138,24 @@
 (define rule_let
   (ds-rule "let" #:capture()
            (let [xs = ~vs ..] ~body)
-           #;(λ (bind* xs ts ϵ) ~body)
            (calctype* ~vs as ts in
-                      ;((λ ϵ ~body) ~vs))))
                       (λ (xs : ts ..) ~body))))
-             ;((λ (bind* xs ts ϵ) ~body) ~vs))))
 
+; ellipses example
+(define rule_ands-empty
+  (ds-rule "ands-empty" #:capture()
+        (ands (cons ~a ϵ))
+        ~a))
 
+(define rule_ands-empty-fixed
+  (ds-rule "ands-empty-fixed" #:capture()
+        (ands (cons ~a ϵ))
+        (calctype ~a as Bool in ~a)))
+
+(define rule_ands-cons
+  (ds-rule "ands-cons" #:capture()
+        (ands (cons ~a (cons ~b ~cs)))
+        (if ~a true (ands (cons ~b ~cs)))))
 
 
 
@@ -160,5 +168,6 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_let)))
+      (list rule_ands-empty rule_ands-empty-fixed rule_ands-cons
+            rule_let)))
 

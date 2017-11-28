@@ -5,10 +5,11 @@
 
 ;;   booleans   (TAPL pg.93)
 ;;   nats       (TAPL pg.93)
+;;   unit       (TAPL pg.119)
 
 (define-resugarable-language arith
-  #:keywords(if true false succ pred iszero zero
-                Bool Nat)
+  #:keywords(if true false succ pred iszero zero unit
+                Bool Nat Unit)
   (e ::= ....
      ; booleans
      (if e e e)
@@ -21,10 +22,13 @@
      true
      false
      ; nats
-     zero)
+     zero
+     ; unit
+     unit)
   (t ::= ....
      Bool
-     Nat)
+     Nat
+     Unit)
   (s ::= ....
      (not s)
      (unless s s s)
@@ -62,9 +66,32 @@
   [(⊢ Γ e t)
    (con (t = Nat))
    ------ t-iszero
-   (⊢ Γ (iszero e) Bool)])
+   (⊢ Γ (iszero e) Bool)]
+
+  ; unit
+  [------ t-unit
+   (⊢ Γ unit Unit)])
 
 
+(define rule_and
+  (ds-rule "and" #:capture()
+           (and ~a ~b)
+           (if ~a ~b false)))
+
+(define rule_not
+  (ds-rule "not" #:capture()
+           (not ~a)
+           (if ~a false true)))
+
+(define rule_unless
+  (ds-rule "unless" #:capture()
+           (unless ~a ~b)
+           (if ~a unit ~b)))
+
+(define rule_ifzero
+  (ds-rule "ifzero" #:capture()
+           (ifzero ~a ~b ~c)
+           (if (iszero ~a) ~b ~c)))
 
 
 
@@ -85,4 +112,4 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_not rule_unless rule_ifzero)))
+      (list rule_not rule_and rule_unless rule_ifzero)))

@@ -5,7 +5,7 @@
 (require "base-lang.rkt")
 
 (provide (all-defined-out)
-         ds-rule resugar define-global
+         ds-rule define-global
          (struct-out Resugared)
          test-match
          global-exists? get-global variable?
@@ -15,6 +15,7 @@
 ;;   - allow sugars to build on each other
 ;;   - use syntax 'pack' and 'unpack'
 ;;   - reverse order of 'bind'
+;;   - in shown derivations, include extension rule at bottom
 
 ;; --------------------------------------------------------------------------------------------------- 
 ;; This file tests type resugaring for a language consisting of:
@@ -50,18 +51,20 @@
 
 
 
+(define-syntax-rule (resugar lang rule ⊢)
+  (resugar-rule lang rule ⊢))
 
 (define-syntax-rule (define-resugarable-language the-lang #:keywords (kw ...) grammar-ext ...)
   (begin
-    (set-language-keywords! 'the-lang (set 'kw ...))
+    (set-language-literals! 'the-lang (set 'kw ...))
     (define-extended-language the-lang base-syntax
       grammar-ext ...)))
 
 (define-syntax (define-core-type-system stx)
   (syntax-case stx ()
     [(define-core-type-system THE_LANG TYPE_RULE ...)
-     (datum->syntax stx (syntax->datum
-#'(begin
+
+ (datum->syntax stx (syntax->datum #'(begin
     
     (define-judgment-form THE_LANG
       #:contract (⊢ Γ e t)
@@ -207,3 +210,5 @@
 ; for testing
 (define-syntax-rule (test-match lang e x)
   (redex-match lang e (term x)))
+
+

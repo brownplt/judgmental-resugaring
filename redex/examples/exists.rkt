@@ -3,10 +3,6 @@
 (require redex)
 (require "../resugar.rkt")
 
-;;   booleans   (TAPL pg.93)
-;;   nats       (TAPL pg.93)
-;;   lambda     (TAPL pg.103)
-
 ;;   existentials (TAPL pg.366)
 
 (define-resugarable-language exists-lang
@@ -150,11 +146,6 @@
 
 (define-global id (a -> a))
 
-(define rule_or
-  (ds-rule "or" #:capture()
-        (or ~a ~b)
-        (let x = ~a in (if x x ~b))))
-
 ; newtype as a pair
 #;(define rule_newtype
   (ds-rule "newtype" #:capture()
@@ -174,7 +165,7 @@
 ; newtype as bindings
 (define rule_newtype 
   (ds-rule "newtype" #:capture()
-        (let-new-type (wrap unwrap) of T as X in ~body)
+        (new-type (wrap unwrap) of T as X in ~body)
         (unpack (pack (T (pair id id))
                    as (∃ X (Pair (T -> X) (X -> T))))
              as (∃ X w)
@@ -188,8 +179,8 @@
 
 
 (define (do-resugar rule)
-  (Resugared-simplified-derivation (resugar exists-lang rule ⊢)))
+  (Resugared-rule (resugar exists-lang rule ⊢)))
 
 (show-derivations
  (map do-resugar
-      (list rule_or rule_newtype)))
+      (list rule_newtype)))

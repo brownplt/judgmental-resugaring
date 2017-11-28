@@ -5,7 +5,7 @@
 
 (provide
  ; resugaring
- (rename-out (resugar-rule resugar))
+ resugar-rule
  (struct-out Resugared)
  ; desugaring rules
  (rename-out (make-rule ds-rule))
@@ -15,7 +15,7 @@
  atom->type-var
  unfreshen
  ; keywords
- set-language-keywords!
+ set-language-literals!
  ; globals
  define-global
  global-exists?
@@ -101,10 +101,10 @@
 
 (define language-literals-map (make-hash))
 
-(define (set-language-keywords! lang literals)
-  (hash-set! language-literals-map lang literals))
-
 (define language-literals (make-parameter (set)))
+
+(define (set-language-literals! lang literals)
+  (hash-set! language-literals-map lang literals))
 
 (define meta-literals (set 'cons 'field 'bind 'bind* 'ϵ))
 
@@ -177,8 +177,8 @@
   (match p
     [(list a '= b)
      (Equation a b)]
-    [(list '⋖ a b)
-     (Assumption (list '⋖ a b))]
+    [(list a '⋖ b)
+     (Assumption (list a '⋖ b))]
     [(list Γ '⊢ x ': t)
      (Judgement Γ x t #f)]
     [(list Γ '⊢* x ': t)
@@ -295,6 +295,8 @@
        [#f t]
        [t2 t2])]
     ['ϵ 'ϵ]
+    [(? number?) t]
+    [(? string?) t]
     [(list 'cons t ts)
      (list 'cons (recur t) (recur ts))]
     [(list 'field x t ts)
@@ -388,16 +390,18 @@
                           (map (λ (d) (simplify-derivation d unif))
                                (derivation-subs deriv))))))
 
-(define-syntax-rule (resugar-rule lang rule ty)
-  (parameterize ([fresh-vars (DsRule-fresh rule)]
-                 [language-literals (hash-ref language-literals-map 'lang)])
-    (reset-names!)
-    (let [[derivations (build-derivations (ty Γ ,(DsRule-rhs rule) _))]]
-      (when (not (eq? 1 (length derivations)))
-        (resugar-error rule derivations))
-      (let [[deriv (first derivations)]]
-        (found-derivation! deriv)
-        (resugar-derivation rule deriv)))))
+(define-syntax (resugar-rule stx)
+  (syntax-case stx ()
+    [(resugar-rule lang rule ⊢)
+     #'(parameterize ([fresh-vars (DsRule-fresh rule)]
+                      [language-literals (hash-ref language-literals-map 'lang)])
+         (reset-names!)
+         (let [[derivations (build-derivations (⊢ Γ ,(DsRule-rhs rule) _))]]
+           (when (not (eq? 1 (length derivations)))
+             (resugar-error rule derivations))
+           (let [[deriv (first derivations)]]
+             (found-derivation! deriv)
+             (resugar-derivation rule deriv))))]))
 
 
 ;; ------------------------------------------------------------
