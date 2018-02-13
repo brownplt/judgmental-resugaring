@@ -400,6 +400,18 @@
 (define-global concatMap
   ((i -> (List o)) -> ((List i) -> (List o))))
 
+(define-global reverse
+  ((List j) -> (List j)))
+
+; [e | True] = e
+(define rule_hlc-true
+  (ds-rule "hlc-true" #:capture()
+           (hlc ~e (hlc/true))
+           (link ~e empty)))
+
+; [e | q] = [e | q, True]
+; (implicit in representation)
+
 ; [e | b, Q] = if b then [e | Q] else []
 (define rule_hlc-guard
   (ds-rule "hlc-guard" #:capture()
@@ -436,7 +448,7 @@
                       (let x = (head lst) in
                       ((loop (tail lst)) (link ~body ans))))
                 with (λ (_ : String) ans))))) in
-       ((loop ~list) nil))))
+       (reverse ((loop ~list) nil)))))
 
 (define rule_λret
   (ds-rule "λret" #:capture(return)
@@ -456,9 +468,11 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_foreach rule_λret
+      (list
+            rule_foreach rule_λret
             rule_inl rule_inr rule_case
             rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
             rule_and-then rule_sum-map rule_or
-            rule_hlc-guard rule_hlc-gen rule_hlc-let)))
+            rule_hlc-guard rule_hlc-gen rule_hlc-let rule_hlc-true
+            )))
 

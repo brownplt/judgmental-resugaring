@@ -34,7 +34,7 @@
      (t* -> t))
   (s ::= ....
      (let bind* s)
-     (ands s*))
+     (ors s*))
   #;(bind* ::= ϵ x (cons (x = s) bind*) (x* = s* ..)))
 
 
@@ -142,20 +142,20 @@
                       (λ (xs : ts ..) ~body))))
 
 ; ellipses example
-(define rule_ands-empty
-  (ds-rule "ands-empty" #:capture()
-        (ands (cons ~a ϵ))
+(define rule_ors-empty
+  (ds-rule "ors-empty" #:capture()
+        (ors (cons ~a ϵ))
         ~a))
 
-(define rule_ands-empty-fixed
-  (ds-rule "ands-empty-fixed" #:capture()
-        (ands (cons ~a ϵ))
+(define rule_ors-empty-fixed
+  (ds-rule "ors-empty-fixed" #:capture()
+        (ors (cons ~a ϵ))
         (calctype ~a as Bool in ~a)))
 
-(define rule_ands-cons
-  (ds-rule "ands-cons" #:capture()
-        (ands (cons ~a (cons ~b ~cs)))
-        (if ~a true (ands (cons ~b ~cs)))))
+(define rule_ors-cons
+  (ds-rule "ors-cons" #:capture()
+        (ors (cons ~a (cons ~b ~cs)))
+        (if ~a true (ors (cons ~b ~cs)))))
 
 
 
@@ -168,6 +168,6 @@
 
 (show-derivations
  (map do-resugar
-      (list rule_ands-empty rule_ands-empty-fixed rule_ands-cons
+      (list rule_ors-empty rule_ors-empty-fixed rule_ors-cons
             rule_let)))
 
