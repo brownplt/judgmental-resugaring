@@ -476,3 +476,4 @@
             rule_hlc-guard rule_hlc-gen rule_hlc-let rule_hlc-true
             )))
 
+;(apply-rule data-lang (list rule_inl rule_or) (or true false))

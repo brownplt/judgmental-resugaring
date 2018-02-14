@@ -9,7 +9,8 @@
          (struct-out Resugared)
          test-match
          global-exists? get-global variable?
-         fresh-type-var fresh-type-var-named atom->type-var unfreshen)
+         fresh-type-var fresh-type-var-named atom->type-var unfreshen
+         apply-rule)
 
 ;; TODO:
 ;;   - allow sugars to build on each other

@@ -9,6 +9,7 @@
  (struct-out Resugared)
  ; desugaring rules
  (rename-out (make-rule ds-rule))
+ apply-rule
  ; freshness
  fresh-type-var
  fresh-type-var-named
@@ -403,9 +404,32 @@
              (found-derivation! deriv)
              (resugar-derivation rule deriv))))]))
 
+(define-syntax (apply-rule stx)
+  (syntax-case stx ()
+    [(apply-rule lang rule-list t)
+     #'(parameterize ([language-literals (hash-ref language-literals-map 'lang)])
+         (reset-names!)
+         (define rules rule-list)
+         (define (recur rules)
+           (if (empty? rules)
+               #f
+               (let* [[rule (first rules)]
+                      [lhs (DsRule-lhs rule)]
+                      [rhs (DsRule-rhs rule)]
+                      [eq (Equation (term t) lhs)]
+                      [unif (try-unify (list eq) (new-unification))]]
+                 (if unif
+                     (substitute unif rhs)
+                     (recur (rest rules))))))
+         (recur rules))]))
 
 ;; ------------------------------------------------------------
 ;; Unification
+
+(define (try-unify eqs unif)
+  (with-handlers
+      [[(λ (exn) (exn:fail? exn)) (λ (exn) #f)]]
+    (unify eqs unif)))
 
 (define (unify eqs unif)
   (match eqs
