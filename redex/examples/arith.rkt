@@ -96,20 +96,14 @@
 
 
 
-(define (do-resugar rule)
-  (Resugared-rule (resugar arith rule ⊢)))
-
-
 (module+ test
   (require test-engine/racket-tests)
 
-  (check-expect (do-resugar rule_not)
+  (check-expect (Resugared-rule (resugar arith rule_not ⊢))
                 (derivation '(Γ ⊢ (not ~a) : Bool) "not"
                             (list (derivation '(Γ ⊢ ~a : Bool) "assume" '()))))
   
   (test))
 
-
-(show-derivations
- (map do-resugar
-      (list rule_not rule_and rule_unless rule_ifzero)))
+(view-sugar-type-rules arith ⊢
+  (list rule_not rule_and rule_unless rule_ifzero))

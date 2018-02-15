@@ -5,10 +5,21 @@
 (provide base-syntax debug)
 
 ;; ---------------------------------------------------------------------------------------------------
-;; base language
+;; Base Language
+;;
+;; This is a minimal base language, meant to be built upon to obtain a type-resugarable language.
+;;   e - expression
+;;   v - value
+;;   s - surface expression
+;;   t - type
+;;   a - pattern variable
+;;   x - variable
+;; 
+;; The "*" variants represent sequences, and the "Rec" variants represent records.
+;; These need to be built-in because they have unique behavior under inference/unification.
 
 (define-language base-syntax
-  (v  ::= unit)
+  (v  ::= unit) ; Redex requires this to be nonempty, so we include a 'unit' value.
   (vRec ::= ϵ (field x v vRec))
   (e  ::= s x v
       (calctype e as t in e)
@@ -41,7 +52,10 @@
                    (t* ⋖ t*)
                    (tRec ⋖ tRec)))
 
+; Some of our judgements are stateful, so disable caching
 (caching-enabled? #f)
+
+;; Debugging ;;
 
 (define-for-syntax debug-enabled? #f)
 
@@ -51,11 +65,3 @@
      (if debug-enabled?
          #'(printf arg ...)
          #'(void))]))
-
-; NOTE:
-; type inference is necessary because:
-;   (Γ ⊢ (atom a) : A
-;   (Γ ⊢ 0 : Nat
-;   [A = Nat -> ??]
-;   ----------------------
-;   (Γ ⊢ ((atom a) 0) : ??)

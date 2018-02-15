@@ -10,47 +10,11 @@
          test-match
          global-exists? get-global variable?
          fresh-type-var fresh-type-var-named atom->type-var unfreshen
-         apply-rule)
+         apply-rule
+         view-sugar-type-rules view-sugar-derivations)
 
-;; TODO:
-;;   - allow sugars to build on each other
-;;   - use syntax 'pack' and 'unpack'
-;;   - reverse order of 'bind'
-;;   - in shown derivations, include extension rule at bottom
-
-;; --------------------------------------------------------------------------------------------------- 
-;; This file tests type resugaring for a language consisting of:
-;;   booleans   (TAPL pg.93)
-;;   numbers    (TAPL pg.93)
-;;   stlc       (TAPL pg.103)
-;;   unit       (TAPL pg.119)
-;;   ascription (TAPL pg.122)
-;;   let        (TAPL pg.124)
-;;   pairs      (TAPL pg.126)
-;;   tuples     (TAPL pg.128)
-;;   records    (TAPL pg.129)
-;;   sums       (TAPL pg.132) (uniq typing on pg. 135 irrelevant w/ T.I.)
-;;   variants   (TAPL pg.136) -- TODO
-;;   fix        (TAPL pg.144)
-;;   lists      (TAPL pg.147)
-;;   refs       (TAPL pg.166) -- TODO
-;;   errors     (TAPL pg.175) (skipping the tiny pre-version)
-;; End of Part II - stopping here
-;;   subtyping  (TAPL pg.186) -- TODO
-;;   subty-rec  (TAPL pg.197) -- TODO
-;;   subty-bot  (TAPL pg.192) -- TODO
-;;   subty-var  (TAPL pg.197) -- TODO
-;;   alg-subty  pg. 211, 212, 217
-;;   featherweight-java (TAPL pg.259)
-;;   iso-recurs (TAPL pg.276) -- TODO
-;;   constraint (TAPL pg.322) -- skip
-;;   system F   (TAPL pg.343) -- TODO
-;;   existential(TAPL pg.366) -- TODO (mostly done)
-
-;; Potential Resugaring Examples:
-;;   encoding existentials (TAPL 24.3 pg.377)
-
-
+;; ---------------------------------------------------------------------------------------------------
+;; Type Resugaring
 
 (define-syntax-rule (resugar lang rule ⊢)
   (resugar-rule lang rule ⊢))
@@ -72,7 +36,7 @@
       #:mode (⊢ I I O)
       TYPE_RULE ...
 
-      [(where x_t ,(atom->type-var (term s))) ; TODO: safety checks!
+      [(where x_t ,(atom->type-var (term s)))
        (con (,(unfreshen (term Γ)) ⊢ s : x_t))
        ------ t-premise
        (⊢ Γ s x_t)]
@@ -123,14 +87,6 @@
        Γ]
       [(append (bind* x* t* ϵ) Γ)
        (bind* x* t* Γ)])
-
-    #;(define-metafunction THE_LANG
-      bind* : x* t* Γ -> Γ
-      [(bind* ϵ ϵ Γ) Γ]
-      [(bind* (cons x x*) (cons t t*) Γ)
-       (bind x t (bind* x* t* Γ))]
-      [(bind* x_s x_ts Γ)
-       (binds x_s x_ts Γ)])
 
     (define-judgment-form THE_LANG
       #:contract (con premise)
@@ -212,4 +168,21 @@
 (define-syntax-rule (test-match lang e x)
   (redex-match lang e (term x)))
 
+; for viewing surface type rules
+(define-syntax-rule (view-sugar-type-rules lang ⊢ rules)
+  (show-derivations
+   (map (λ (rule) (Resugared-rule (resugar lang rule ⊢)))
+        rules)))
+
+; for viewing surface type derivations
+(define-syntax-rule (view-sugar-derivations lang ⊢ rules)
+  (show-derivations
+   (map (λ (rule) (Resugared-derivation (resugar lang rule ⊢)))
+        rules)))
+
+;; WISH LIST:
+;; (Features that would be valuable to have, but didn't make the paper cut.)
+;;   - Allow sugars to build on each other
+;;   - In shown derivations, include extension rule at bottom
+;;   - Try resugaring the encoding of existentials, shown in TAPL 24.3 pg. 377
 

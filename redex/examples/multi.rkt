@@ -80,26 +80,6 @@
    ------ t-id-bind
    (⊢ Γ x x_t)]
 
-  #;[(⊢ (append Γ Γ_params) e t)
-   (env-types Γ_params t*)
-   ------ t-lambda
-   (⊢ Γ (λ Γ_params e) (t* -> t))]
-
-  #;[(⊢ (bind* x* t* Γ) e t)
-   ------ t-lambda
-   (⊢ Γ (λ [x* : t* ..] e) (t* -> t))]
-
-  #;[(⊢ Γ e t)
-   ------ t-lambda-empty
-   (⊢ Γ (λ ϵ e) (ϵ -> t))]
-
-  #;[(⊢ Γ (λ param*) t_fun)
-   (where x_args (fresh-var))
-   (where x_ret (fresh-var))
-   (con (t_fun = (x_args -> x_ret)))
-   ------ t-lambda-cons
-   (⊢ Γ (λ (cons (x : t) param*) e) ((cons t x_args) -> x_ret))]
-
   [(⊢ (append Γ_params Γ) e t)
    (env-types Γ_params t*)
    ------ t-lambda
@@ -142,17 +122,17 @@
                       (λ (xs : ts ..) ~body))))
 
 ; ellipses example
-(define rule_ors-empty
+(define rule_sugar-or-1
   (ds-rule "ors-empty" #:capture()
         (ors (cons ~a ϵ))
         ~a))
 
-(define rule_ors-empty-fixed
+(define rule_sugar-or-1-fixed
   (ds-rule "ors-empty-fixed" #:capture()
         (ors (cons ~a ϵ))
         (calctype ~a as Bool in ~a)))
 
-(define rule_ors-cons
+(define rule_sugar-or-2
   (ds-rule "ors-cons" #:capture()
         (ors (cons ~a (cons ~b ~cs)))
         (if ~a true (ors (cons ~b ~cs)))))
@@ -160,14 +140,6 @@
 
 
 
-
-
-
-(define (do-resugar rule)
-  (Resugared-rule (resugar multi rule ⊢)))
-
-(show-derivations
- (map do-resugar
-      (list rule_ors-empty rule_ors-empty-fixed rule_ors-cons
-            rule_let)))
-
+(view-sugar-type-rules multi ⊢
+  (list rule_sugar-or-1 rule_sugar-or-1-fixed rule_sugar-or-2
+        rule_let))

@@ -3,7 +3,7 @@
 (require redex)
 (require "../resugar.rkt")
 
-;;   subtyping  (TAPL pg.186)
+;;   subtyping  (TAPL pg.212)
 
 (define-resugarable-language subtype-lang
   #:keywords(if true false succ pred iszero zero
@@ -132,10 +132,5 @@
 
 
 
-
-(define (do-resugar rule)
-  (Resugared-rule (resugar subtype-lang rule ⊢)))
-
-(show-derivations
- (map do-resugar
-      (list rule_upcast)))
+(view-sugar-type-rules subtype-lang ⊢
+  (list rule_upcast))

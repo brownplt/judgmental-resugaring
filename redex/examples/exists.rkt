@@ -176,11 +176,5 @@
 
 
 
+(view-sugar-type-rules exists-lang ⊢ (list rule_newtype))
 
-
-(define (do-resugar rule)
-  (Resugared-rule (resugar exists-lang rule ⊢)))
-
-(show-derivations
- (map do-resugar
-      (list rule_newtype)))

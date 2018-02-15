@@ -199,13 +199,6 @@
 
 
 
-
-
-(define (do-resugar rule)
-  (Resugared-rule (resugar lamb rule ⊢)))
-
-(show-derivations
- (map do-resugar
-      (list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype
-            rule_cps-var rule_cps-lambda rule_cps-apply)))
-
+(view-sugar-type-rules lamb ⊢
+  (list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype
+        rule_cps-var rule_cps-lambda rule_cps-apply))

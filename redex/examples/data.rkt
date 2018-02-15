@@ -462,18 +462,10 @@
 
 
 
-
-(define (do-resugar rule)
-  (Resugared-rule (resugar data-lang rule ⊢)))
-
-(show-derivations
- (map do-resugar
-      (list
-            rule_foreach rule_λret
-            rule_inl rule_inr rule_case
-            rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
-            rule_and-then rule_sum-map rule_or
-            rule_hlc-guard rule_hlc-gen rule_hlc-let rule_hlc-true
-            )))
-
-;(apply-rule data-lang (list rule_inl rule_or) (or true false))
+(view-sugar-type-rules data-lang ⊢
+  (list
+   rule_foreach rule_λret
+   rule_inl rule_inr rule_case
+   rule_for-map rule_let-pair rule_tuple2 rule_rec-point rule_rec-sum
+   rule_and-then rule_sum-map rule_or
+   rule_hlc-guard rule_hlc-gen rule_hlc-let rule_hlc-true))
