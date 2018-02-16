@@ -8,6 +8,7 @@
  resugar-rule
  (struct-out Resugared)
  ; desugaring rules
+ (struct-out DsRule)
  (rename-out (make-rule ds-rule))
  apply-rule
  ; freshness
@@ -364,14 +365,6 @@
 (define (found-derivation! deriv)
   #;(show-derivations (list deriv))
   (printf "Derivation found!\n~a\n" deriv))
-
-#;(define (resugar-premise unif premise)
-  (let [[premise (substitute unif premise)]]
-    (let [[derivs (dynamic-build-derivations premise)]]
-      (match (length derivs)
-        [0 (list premise)]
-        [1 (get-premises (first derivs))]
-        [_ (error/ambiguous-premise premise)]))))
 
 (define (resugar-derivation rule deriv)
   (let* [[premises (map read-premise (get-premises deriv))]

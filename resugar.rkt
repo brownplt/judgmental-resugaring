@@ -7,6 +7,7 @@
 (provide (all-defined-out)
          ds-rule define-global
          (struct-out Resugared)
+         (struct-out DsRule)
          test-match
          global-exists? get-global variable?
          fresh-type-var fresh-type-var-named atom->type-var unfreshen
@@ -179,6 +180,13 @@
   (show-derivations
    (map (λ (rule) (Resugared-derivation (resugar lang rule ⊢)))
         rules)))
+
+; for saving a type rule to a .ps file
+(define-syntax-rule (save-sugar-type-rules lang ⊢ rules)
+  (map (λ (rule)
+         (let [[deriv (Resugared-rule (resugar lang rule ⊢))]]
+           (derivation/ps deriv (string-append (DsRule-name rule) ".png"))))
+       rules))
 
 ;; WISH LIST:
 ;; (Features that would be valuable to have, but didn't make the paper cut.)
