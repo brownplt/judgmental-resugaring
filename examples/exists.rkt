@@ -146,23 +146,7 @@
 
 (define-global id (a -> a))
 
-; newtype as a pair
-#;(define rule_newtype
-  (ds-rule "newtype" #:capture()
-        (let-new-type w of T as X in ~body)
-        (let (∃ X w) = (∃ T (pair id id) as
-          (∃ X (Pair (T -> X) (X -> T)))) in
-          ~body)))
-
-; newtype as a record
-#;(define rule_newtype
-  (ds-rule "newtype" #:capture()
-        (let-new-type w of T as X in ~body)
-        (let (∃ X w) = (∃ T (record (field wrap id (field unwrap id ϵ))) as
-          (∃ X (Record (field wrap (T -> X) (field unwrap (X -> T) ϵ))))) in
-          ~body)))
-
-; newtype as bindings
+; newtype as bindings (as shown in paper)
 (define rule_newtype 
   (ds-rule "newtype" #:capture()
         (new-type (wrap unwrap) of T as X in ~body)
@@ -172,6 +156,22 @@
              in  (let wrap = (fst w) in
                    (let unwrap = (snd w) in
                      ~body)))))
+
+; newtype as a pair (another way that 'newtype' could be defined)
+#;(define rule_newtype
+  (ds-rule "newtype" #:capture()
+        (let-new-type w of T as X in ~body)
+        (let (∃ X w) = (∃ T (pair id id) as
+          (∃ X (Pair (T -> X) (X -> T)))) in
+          ~body)))
+
+; newtype as a record (another way that 'newtype' could be defined)
+#;(define rule_newtype
+  (ds-rule "newtype" #:capture()
+        (let-new-type w of T as X in ~body)
+        (let (∃ X w) = (∃ T (record (field wrap id (field unwrap id ϵ))) as
+          (∃ X (Record (field wrap (T -> X) (field unwrap (X -> T) ϵ))))) in
+          ~body)))
 
 
 

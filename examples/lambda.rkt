@@ -169,23 +169,23 @@
         (letrec x : ~t = ~a in ~b)
         ((λ (x : ~t) ~b) (fix (λ (x : ~t) ~a)))))
 
-(define rule_cps-var
-  (ds-rule "cps-var" #:capture()
-           (cps x)
-           x))
-
 ; to contrast with typed racket
 (define rule_of-one
   (ds-rule "of-one" #:capture()
            (of-one ~f)
            (~f "one")))
 
-(define rule_cps-lambda
+#;(define rule_cps-var
+  (ds-rule "cps-var" #:capture()
+           (cps x)
+           x))
+
+#;(define rule_cps-lambda
   (ds-rule "cps-lambda" #:capture()
            (cps (λ (x : t) ~e))
            (λ (x : Tx) (cps ~e))))
 
-(define rule_cps-apply
+#;(define rule_cps-apply
   (ds-rule "cps-apply" #:capture()
            (cps (~func ~arg))
            (calctype ~func as (Arg -> Ret) in
@@ -200,5 +200,4 @@
 
 
 (view-sugar-type-rules lamb ⊢
-  (list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype
-        rule_cps-var rule_cps-lambda rule_cps-apply))
+  (list rule_letrec rule_thunk rule_let rule_or rule_seq rule_sametype))
