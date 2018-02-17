@@ -184,9 +184,34 @@
 ; for saving a type rule to a .ps file
 (define-syntax-rule (save-sugar-type-rules lang ⊢ rules)
   (map (λ (rule)
-         (let [[deriv (Resugared-rule (resugar lang rule ⊢))]]
-           (derivation/ps deriv (string-append (DsRule-name rule) ".png"))))
+         (let* [[deriv (Resugared-rule (resugar lang rule ⊢))]
+                [filename (string-append (DsRule-name rule) ".tex")]
+                [port (open-output-file filename #:exists 'replace)]]
+           (fprintf port "\\begin{prooftree}~n")
+           (derivation/latex deriv port)
+           (fprintf port "\\end{prooftree}~n")
+           (close-output-port port)))
        rules))
+
+; render a derivation as latex
+(define (derivation/latex derivation
+                          [out (current-output-port)]
+                          #:term/latex [term/latex (curry format "$~a$")])
+  (let* ([term (term/latex (derivation-term derivation))]
+         [name (derivation-name derivation)]
+         [subs (derivation-subs derivation)])
+    (if (string=? name "premise")
+        (fprintf out "\\RZero[]{~a}~n" term)
+        (begin (for-each (curryr derivation/latex out) subs)
+               (fprintf out "~a[~a]{~a}~n"
+                        (match (length subs)
+                          [0 "\\RZero{}\n\\ROne"]
+                          [1 "\\ROne"]
+                          [2 "\\RTwo"]
+                          [3 "\\RThree"]
+                          [4 "\\RFour"]
+                          [5 "\\RFive"])
+                        name term)))))
 
 ;; WISH LIST:
 ;; (Features that would be valuable to have, but didn't make the paper cut.)
