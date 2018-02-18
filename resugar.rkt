@@ -181,6 +181,12 @@
    (map (λ (rule) (Resugared-derivation (resugar lang rule ⊢)))
         rules)))
 
+; for viewing simplified surface type derivations
+(define-syntax-rule (view-sugar-simplified-derivations lang ⊢ rules)
+  (show-derivations
+   (map (λ (rule) (Resugared-simplified-derivation (resugar lang rule ⊢)))
+        rules)))
+
 ; for saving a type rule to a .ps file
 (define-syntax-rule (save-sugar-type-rules lang ⊢ rules)
   (map (λ (rule)
