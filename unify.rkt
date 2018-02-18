@@ -372,7 +372,8 @@
          [concl-type (fourth (derivation-term deriv))]
          [concl-env (second (derivation-term deriv))]
          [concl (write-premise #f (Judgement concl-env (DsRule-lhs rule) concl-type #f))]
-         [tyrule (make-sugar-rule (DsRule-name rule) concl unif)]]
+         [tyrule (make-sugar-rule (DsRule-name rule) concl unif)]
+         [deriv (derivation concl (DsRule-name rule) (list deriv))]]
     (Resugared tyrule deriv (simplify-derivation deriv unif))))
 
 (define (simplify-derivation deriv unif)
