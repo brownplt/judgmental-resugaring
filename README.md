@@ -23,15 +23,14 @@ interesting case studies.
 1. Install [DrRacket, version 6.10.1](https://download.racket-lang.org/all-versions.html).
    SweetT should also work fine with later versions of DrRacket. If it
    does not, please open a github issue and I'll see if I can fix it.
-2. If you're on Linux, you can start DrRacket by running
-   `/usr/racket/bin/drracket`. You can also add it to your path:
-
-         PATH=/usr/racket/bin:$PATH
-         export PATH
-3. Try running the `arith.rkt` test in the `examples` directory by
-   opening it in DrRacket and hitting "Run". You should see a popup 
-   showing resugared type rules for the sugars defined in the file.
-   You can browse them by clicking "Prev Derivation" and "Next Derivation".
+   (On Linux, you can either use the download link above and then run
+   DrRacket from `/usr/racket/bin/drracket`, or---assuming your package
+   manager is apt-get---you can simply run `sudo apt-get install racket`.
+2. Try running the `arith.rkt` test in the `examples` directory by
+   opening it in DrRacket (file/open or Ctrl-o) and hitting "Run". You
+   should see a popup showing resugared type rules for the sugars
+   defined in the file.  You can browse them by clicking "Prev
+   Derivation" and "Next Derivation".
 
 ## Usage Guide
 
@@ -91,7 +90,7 @@ The first line says that this file is written in the Racket language,
 since DrRacket is an editor for many different languages. The next two
 lines say that we're going to use
 [redex](https://docs.racket-lang.org/redex/), which SweetT is built
-on, and `resugar.rkt`, which is the main import for SweetT.
+on, and `resugar.rkt`, which is SweetT itself.
 
     #lang racket
 
@@ -101,12 +100,13 @@ on, and `resugar.rkt`, which is the main import for SweetT.
 Next we define the language with `define-resugarable-language`. This
 takes a language name (`demo`), a list of keywords (to help SweetT
 tell the difference between a keyword and a variable), and a set of
-extensions to productions in the language grammar. (This builds
-upon a very basic language defined in `base-lang.rkt`; this base
-language contains things like the `calc-type` feature described in the
-paper.) In this case, we extend expressions `e` with `if` expressions,
-values `v` with `true` and `false`, types `t` with `Bool`, and surface
-expressions `s` with `(not s)`, which will be a sugar.
+extensions to productions in the language grammar. (The language you
+define will build upon a very basic language defined in
+`base-lang.rkt`; this base language contains things like the
+`calc-type` feature described in the paper.) In this case, we extend
+expressions `e` with `if` expressions, values `v` with `true` and
+`false`, types `t` with `Bool`, and surface expressions `s` with `(not
+s)`, which will be a sugar.
 
     (define-resugarable-language demo
       #:keywords(if true false Bool)
@@ -129,7 +129,7 @@ variable, SweetT instead requires that the rule be written using two
 different type variables, with an equality constraint between them -
 thus making the unification explicit." Thus in the `t-if` rule, we
 write the equality constraints `(con (t_1 = Bool))` and `(con (t_2 =
-t_3))` (`con` stands for "constraint").
+t_3))`.
 
     (define-core-type-system demo
       [(⊢ Γ e_1 t_1)
@@ -149,51 +149,63 @@ t_3))` (`con` stands for "constraint").
 Now we're ready to write a desugaring rule. This is done with the
 `ds-rule` function, which takes a rule name (`not`), a set of
 variables to capture (typically the empty set), a left-hand-side `(not
-~a`, and a right-hand-side `(if ~a false true)`. Pattern variables are
+~a)`, and a right-hand-side `(if ~a false true)`. Pattern variables are
 written with a tilde, so `~a` is a pattern variable. This rule does
 not contain any regular variables, but they would be written without a
 tilde. Since `false` and `true` appeared in the keyword list above,
-they are interpreted as keywords rather than variables.
+they are interpreted as keywords rather than variables. Finally, rules
+can optionally choose to capture variables (i.e., be unhygienic) by
+listing them in the `#:capture()` list.
 
     (define rule_not
       (ds-rule "not" #:capture()
                (not ~a)
                (if ~a false true)))
 
-Finally, we can resugar this rule and view the resulting type rules.
+Finally, we can resugar this rule and view the resulting type rule.
 `view-sugar-type-rules` expects a language name (`demo`), a type judgement
 relation (which will always be `⊢`), and a list of rewrite rules to
 resugar `(list rule_not)`. It then displays the inferred type rule for
-`not` in a popup.
+`not` in a popup window.
 
     (view-sugar-type-rules demo ⊢ (list rule_not))
 
 To see the type derivation that led to this type rule, use
-`view-sugar-derivations` instead.
+`view-sugar-derivations` instead. (Alternatively,
+`view-sugar-simplified-derivations` for the simplified derivation,
+in which type equalities have been eliminated via unification.)
 
 ### How to Read the Type Rules
 
-Basics:
+Here is a basic guide for how to read SweetT's type rules.
 
+__Basics:__
+
+    (⊢ Γ e t)     means  Γ ⊢ e : t
     (bind x t Γ)  means  x:t, Γ
     ~A            means  a pattern variable
     A             means  a variable (or type variable)
 
-Calctype (described in section 4.1):
+__Calctype__ (described in section 4.1):
 
     (calctype e as t in e2)  means  assert that 'e' has type 't', and evaluate e2
 
-Sequences (described in section 4.5):
+__Sequences__ (described in section 4.5):
 
     ϵ            means an empty list or empty record
     (cons e e*)  means cons e onto the front of the sequence e*
 
-Not described in paper:
+__Not described in paper:__
 
     (field x e eRec)          means add the field x:e to record eRec
     (bind* x* t* Γ)           means  x_1:t_1, ..., x_n:t_n, Γ
     (calctype* e* as t* in e) means  (calctype e_1 as t_1 in ... (calctype e_n as t_n in e) ...)
 
+__Type Derivations__
+
+When reading SweetT type derivations, you can ignore "con-" rules that
+appear at the top of the derivation. You'll notice that they just
+repeat what's below them; they're there for technical reasons.
 
 # Artifact Evaluation Instructions
 
@@ -207,9 +219,9 @@ Not described in paper:
 
 ## Evaluation: Type Systems (section 6.1 from the paper)
 
-There are test cases for SweetT on the following type system features
-from TAPL (Types and Programming Languages, Benjamin Pierce). These
-can be found in the `examples` directory.
+The paper lists a number of type system features that we tested SweetT
+against. (TAPL stands for "Types and Programming Languages, by
+Benjamin Pierce.)
 
     booleans    - TAPL pg.93
     numbers     - TAPL pg.93
@@ -247,7 +259,8 @@ We say in the paper: "We tested each type system by picking one or
 more sugars that made use of its features, resugaring them to obtain
 type rules, and validating the resulting type rules by hand. All of
 them resugared successfully. The full version of the paper will
-provide an appendix with complete details."
+provide an appendix with complete details." You can find the full
+paper in the zipfile (paper.pdf).
 
 You can verify that:
 
@@ -273,8 +286,13 @@ For each sugar in the case studies, you can verify that:
    examples.)
 2. The resugared type rule matches what's shown in the paper.
 3. When the paper also shows the full type derivation that led to that
-   type rule, the resugared type rule matches what's shown in the
-   paper.
+   type rule, the resugared type derivation matches what's shown in the
+   paper. To see the resugared type derivation, you can run
+   `view-sugar-derivations` instead of `view-sugar-type-rules`.
+
+Note that (quoting the paper): "To make the examples fit we show the
+derivations after unification, eliminating equality constraints."
+
 
 ### Foreach
 
@@ -309,14 +327,16 @@ The "upcast" example is named `rule_upcast` in `examples/subtype.rkt`.
 
 The "letrec" example is named `rule_letrec` in `examples/lambda.rkt`.
 
-The "rule_λret" example is named `rule_λret` in `examples/data.rkt`.
+The "rule\_λret" example is named `rule_λret` in `examples/data.rkt`.
 
 ### Examples in the paper
 
 Additionally, there are a few examples of type resugaring described in
 prose in the paper:
 
-* `t-and` from section 2 is tested in `examples/arith.rkt`.
-* `t-or` from section 2 is tested in `examples/arith.rkt`.
+* `t-and` from section 2 is tested in `examples/arith.rkt`. Note that,
+  for expository purposes, the derivation shown in the paper is
+  simplified. (You can view this with `view-sugar-simplified-derivations`.)
+* `t-or` from section 2 is tested in `examples/data.rkt`.
 * `sugar-or-1` and `sugar-or-2` from section 4.5 are tested in
   `examples/multi.rkt`.
