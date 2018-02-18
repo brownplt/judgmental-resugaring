@@ -34,7 +34,7 @@
      (t* -> t))
   (s ::= ....
      (let bind* s)
-     (ors s*))
+     (or s*))
   #;(bind* ::= ϵ x (cons (x = s) bind*) (x* = s* ..)))
 
 
@@ -123,19 +123,19 @@
 
 ; ellipses example
 (define rule_sugar-or-1
-  (ds-rule "ors-empty" #:capture()
-        (ors (cons ~a ϵ))
+  (ds-rule "sugar-or-1" #:capture()
+        (or (cons ~a ϵ))
         ~a))
 
 (define rule_sugar-or-1-fixed
-  (ds-rule "ors-empty-fixed" #:capture()
-        (ors (cons ~a ϵ))
+  (ds-rule "sugar-or-1-fixed" #:capture()
+        (or (cons ~a ϵ))
         (calctype ~a as Bool in ~a)))
 
 (define rule_sugar-or-2
-  (ds-rule "ors-cons" #:capture()
-        (ors (cons ~a (cons ~b ~cs)))
-        (if ~a true (ors (cons ~b ~cs)))))
+  (ds-rule "sugar-or-2" #:capture()
+        (or (cons ~a (cons ~b ~cs)))
+        (if ~a true (or (cons ~b ~cs)))))
 
 
 
