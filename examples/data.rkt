@@ -401,13 +401,13 @@
   ((i -> (List o)) -> ((List i) -> (List o))))
 
 (define-global reverse
-  ((List j) -> (List j)))
+  ((List T) -> (List T)))
 
 ; [e | True] = e
 (define rule_hlc-true
   (ds-rule "hlc-true" #:capture()
            (hlc ~e (hlc/true))
-           (link ~e empty)))
+           (link ~e empty))) ; (link means cons)
 
 ; [e | q] = [e | q, True]
 ; (implicit in representation)
@@ -446,7 +446,7 @@
                ans
                (try (let break = (λ (_ : Unit) (raise "")) in
                       (let x = (head lst) in
-                      ((loop (tail lst)) (link ~body ans))))
+                      ((loop (tail lst)) (link ~body ans)))) ; (link means cons)
                 with (λ (_ : String) ans))))) in
        (reverse ((loop ~list) nil)))))
 
