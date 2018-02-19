@@ -48,7 +48,7 @@ To see how to use SweetT, let's walk through a small demo (found in
     #lang racket
 
     (require redex)
-    (require "../resugar.rkt")
+    (require "../sweet-t.rkt")
     
     ;; This is a super-simple resugaring demo to demonstrate the API.
     
@@ -89,12 +89,12 @@ To see how to use SweetT, let's walk through a small demo (found in
 The first line says that this file is written in the Racket language.
 The next two lines say that we're going to use
 [redex](https://docs.racket-lang.org/redex/), which SweetT is built
-on, and `resugar.rkt`, which is SweetT itself.
+on, and `sweet-t.rkt`, which is SweetT itself.
 
     #lang racket
 
     (require redex)
-    (require "../resugar.rkt")
+    (require "../sweet-t.rkt")
 
 Next we define the language with `define-resugarable-language`. This
 takes a language name (`demo`), a list of keywords (to help SweetT
