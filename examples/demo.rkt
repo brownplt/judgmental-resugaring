@@ -1,7 +1,7 @@
 #lang racket
 
 (require redex)
-(require "../resugar.rkt")
+(require "../sweet-t.rkt")
 
 ;; This is a super-simple resugaring demo to demonstrate the API.
 

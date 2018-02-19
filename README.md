@@ -25,7 +25,7 @@ interesting case studies.
    does not, please open a github issue and I'll see if I can fix it.
    (On Linux, you can either use the download link above and then run
    DrRacket from `/usr/racket/bin/drracket`, or---assuming your package
-   manager is apt-get---you can simply run `sudo apt-get install racket`.
+   manager is apt-get---you can simply run `sudo apt-get install racket`.)
 2. Try running the `arith.rkt` test in the `examples` directory by
    opening it in DrRacket (file/open or Ctrl-o) and hitting "Run". You
    should see a popup showing resugared type rules for the sugars
@@ -86,9 +86,8 @@ To see how to use SweetT, let's walk through a small demo (found in
 
     (view-sugar-type-rules demo ⊢ (list rule_not))
 
-The first line says that this file is written in the Racket language,
-since DrRacket is an editor for many different languages. The next two
-lines say that we're going to use
+The first line says that this file is written in the Racket language.
+The next two lines say that we're going to use
 [redex](https://docs.racket-lang.org/redex/), which SweetT is built
 on, and `resugar.rkt`, which is SweetT itself.
 
@@ -309,8 +308,8 @@ The Haskell List Comprehension sugars can also be found in
 `rule_hlc-gen`, and `rule_hlc-let`. The syntax mapping between the
 Redex terms (in the implementation) and Haskell (in the paper) is:
 
-    Redex         Haskell
-    ~~~~~         ~~~~~~~
+    Haskell       Redex
+    ~~~~~~~       ~~~~~
     [e | Q]       (hlc e Q)
     b, Q          (hlc/guard b Q)
     p <- l, Q     (hlc/gen p l Q)

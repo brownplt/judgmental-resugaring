@@ -1,7 +1,7 @@
 #lang racket
 
 (require redex)
-(require "../resugar.rkt")
+(require "../sweet-t.rkt")
 
 ;;   existentials (TAPL pg.366)
 

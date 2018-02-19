@@ -1,7 +1,7 @@
 #lang racket
 
 (require redex)
-(require "../resugar.rkt")
+(require "../sweet-t.rkt")
 
 ;;   subtyping  (TAPL pg.212)
 

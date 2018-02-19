@@ -1,7 +1,7 @@
 #lang racket
 
 (require redex)
-(require "../resugar.rkt")
+(require "../sweet-t.rkt")
 
 ;; Multi-arity lambda example.
 ;; This extends TAPL lambdas to handle multiple arguments.

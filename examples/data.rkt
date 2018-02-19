@@ -1,7 +1,7 @@
 #lang racket
 
 (require redex)
-(require "../resugar.rkt")
+(require "../sweet-t.rkt")
 
 ;;   let        (TAPL pg.124)
 ;;   pairs      (TAPL pg.126)

@@ -1,7 +1,7 @@
 #lang racket
 
 (require redex)
-(require "../resugar.rkt")
+(require "../sweet-t.rkt")
 
 ;;   booleans   (TAPL pg.93)
 ;;   nats       (TAPL pg.93)
