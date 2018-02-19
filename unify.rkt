@@ -363,8 +363,7 @@
               (append premises assumptions))))
 
 (define (found-derivation! deriv)
-  #;(show-derivations (list deriv))
-  (printf "Derivation found!\n~a\n" deriv))
+  (debug "Derivation found!\n~a\n" deriv))
 
 (define (resugar-derivation rule deriv)
   (let* [[premises (map read-premise (get-premises deriv))]
