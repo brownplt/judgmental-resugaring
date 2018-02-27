@@ -219,6 +219,10 @@ repeat what's below them; they're there for technical reasons.
    through all of the claims we believe the paper makes next, and
    describe how to verify them.
 
+The zip file you received has the "full" version of the paper, which
+includes an appendix that will be useful. It also fixes some mistakes
+in the original paper: e.g. the example in section 4.5 was wrong.
+
 ## Evaluation: Type Systems (section 6.1 from the paper)
 
 The paper lists a number of type system features that we tested SweetT
