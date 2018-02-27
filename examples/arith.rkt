@@ -101,7 +101,7 @@
 
   (check-expect (Resugared-rule (resugar arith rule_not ⊢))
                 (derivation '(Γ ⊢ (not ~a) : Bool) "not"
-                            (list (derivation '(Γ ⊢ ~a : Bool) "assume" '()))))
+                            (list (derivation '(Γ ⊢ ~a : Bool) "premise" '()))))
   
   (test))
 
