@@ -118,7 +118,7 @@
    (con (t_1 = Num))
    (con (t_2 = Num))
    ------ t-plus
-   (⊢ Γ (+ e_1 e_2) Nat)]
+   (⊢ Γ (+ e_1 e_2) Num)]
 
   ; string
   [------ t-str

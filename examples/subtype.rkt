@@ -60,6 +60,9 @@
    (⊢ Γ false Bool)]
 
   ; nats
+  [------ t-zero
+   (⊢ Γ zero Nat)]
+  
   [(⊢ Γ e t)
    (con (t = Nat))
    ------ t-succ
