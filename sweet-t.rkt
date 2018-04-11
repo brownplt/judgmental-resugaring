@@ -187,16 +187,26 @@
    (map (λ (rule) (Resugared-simplified-derivation (resugar lang rule ⊢)))
         rules)))
 
+(define (save-derivation deriv filename)
+  (let [[port (open-output-file filename #:exists 'replace)]]
+    (fprintf port "\\begin{prooftree}~n")
+    (derivation/latex deriv port)
+    (fprintf port "\\end{prooftree}~n")
+    (close-output-port port)))
+
 ; for saving a type rule to a .ps file
 (define-syntax-rule (save-sugar-type-rules lang ⊢ rules)
   (map (λ (rule)
          (let* [[deriv (Resugared-rule (resugar lang rule ⊢))]
-                [filename (string-append (DsRule-name rule) ".tex")]
-                [port (open-output-file filename #:exists 'replace)]]
-           (fprintf port "\\begin{prooftree}~n")
-           (derivation/latex deriv port)
-           (fprintf port "\\end{prooftree}~n")
-           (close-output-port port)))
+                [filename (string-append (DsRule-name rule) ".tex")]]
+           (save-derivation deriv filename)))
+       rules))
+
+(define-syntax-rule (save-sugar-simplified-derivations lang ⊢ rules)
+  (map (λ (rule)
+         (let* [[deriv (Resugared-simplified-derivation (resugar lang rule ⊢))]
+                [filename (string-append (DsRule-name rule) ".tex")]]
+           (save-derivation deriv filename)))
        rules))
 
 ; render a derivation as latex
