@@ -20,9 +20,6 @@ interesting case studies.
 
 ## Installation Instructions
 
-0. [Download SweetT from here](https://github.com/brownplt/judgmental-resugaring/releases/tag/v1.0).
-   (Note to artifact reviewers: if you are reading this, you probably
-   already have the zipfile.)
 1. Install [DrRacket, version 6.10.1](https://download.racket-lang.org/all-versions.html).
    SweetT should also work fine with later versions of DrRacket. If it
    does not, please open a github issue and I'll see if I can fix it.
